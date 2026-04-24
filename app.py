@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Función de optimización de barras
+# Función para optimizar el corte de barras
 def optimizar_barras(piezas, largo=600):
     if not piezas: return []
     piezas.sort(reverse=True)
@@ -24,25 +24,27 @@ with st.form("mi_formulario"):
     st.subheader("📝 Ingresar Nueva Ventana")
     col1, col2 = st.columns(2)
     with col1: 
-        ancho = st.number_input("Ancho total (cm)", min_value=0.0, step=0.1, key="ancho")
+        ancho = st.number_input("Ancho total (cm)", min_value=0.0, step=0.1)
     with col2: 
-        alto = st.number_input("Alto total (cm)", min_value=0.0, step=0.1, key="alto")
+        alto = st.number_input("Alto total (cm)", min_value=0.0, step=0.1)
     
-    # LÍNEA 31 CORREGIDA: Ahora tiene la lista [2, 3, 4]
+    # LÍNEA CORREGIDA: Ahora incluye la lista de opciones [2, 3, 4]
     div = st.selectbox("Número de divisiones", options=)
     
     enviar = st.form_submit_button("➕ Agregar Ventana al Pedido")
 
     if enviar:
         if ancho > 0 and alto > 0:
-            jamba, riel = alto, ancho - 1.5
-            pierna, gancho = alto - 3.5, alto - 3.5
+            jamba = alto
+            riel = ancho - 1.5
+            pierna = alto - 3.5
+            gancho = alto - 3.5
             
             if div == 2:
                 zocalo, c_z, c_p = (ancho-16)/2, 4, 2
             elif div == 3:
                 zocalo, c_z, c_p = (ancho-26.5)/3, 6, 4
-            else:
+            else: # 4 divisiones
                 zocalo, c_z, c_p = (ancho-30)/4, 8, 6
             
             st.session_state.pedido.append({
@@ -59,9 +61,9 @@ with st.form("mi_formulario"):
             })
             st.success(f"✅ Ventana {ancho}x{alto} agregada.")
         else:
-            st.error("⚠️ Ingresa medidas mayores a 0.")
+            st.error("⚠️ Por favor, ingresa medidas mayores a cero.")
 
-# --- MOSTRAR RESULTADOS ---
+# --- RESULTADOS ---
 if st.session_state.pedido:
     if st.button("🗑️ Borrar todo el pedido"):
         st.session_state.pedido = []
