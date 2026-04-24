@@ -38,39 +38,29 @@ st.title("🛠️ Sistema Linea 25 Pro")
 if 'pedido' not in st.session_state:
     st.session_state.pedido = []
 
-# --- BARRA LATERAL (GUARDAR Y CARGAR) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.header("📂 Mis Proyectos")
-    
     if st.session_state.pedido:
         proyecto_json = json.dumps(st.session_state.pedido)
-        st.download_button(
-            label="📥 Descargar Proyecto",
-            data=proyecto_json,
-            file_name="proyecto_aluminio.json",
-            mime="application/json"
-        )
+        st.download_button(label="📥 Descargar Proyecto", data=proyecto_json, file_name="proyecto.json", mime="application/json")
     
-    st.divider()
-    
-    archivo_subido = st.file_uploader("📂 Abrir proyecto antiguo (.json)", type="json")
+    archivo_subido = st.file_uploader("📂 Abrir proyecto (.json)", type="json")
     if archivo_subido:
         st.session_state.pedido = json.load(archivo_subido)
-        st.success("¡Proyecto cargado!")
+        st.success("¡Cargado!")
     
-    st.divider()
-    
-    if st.button("🗑️ Iniciar Nuevo Proyecto"):
+    if st.button("🗑️ Nuevo Proyecto"):
         st.session_state.pedido = []
         st.rerun()
 
-# --- FORMULARIO DE ENTRADA ---
+# --- FORMULARIO (CORREGIDO) ---
 with st.form("nuevo_registro"):
     st.subheader("📝 Datos de la Ventana")
     c1, c2, c3 = st.columns(3)
     with c1: ancho = st.number_input("Ancho (cm)", min_value=0.0, step=0.1)
     with c2: alto = st.number_input("Alto (cm)", min_value=0.0, step=0.1)
-    # LÍNEA 76 CORREGIDA AQUÍ:
+    # LÍNEA 74 REVISADA:
     with c3: div = st.selectbox("Hojas",)
     
     enviar = st.form_submit_button("➕ Agregar Ventana")
@@ -95,36 +85,28 @@ with st.form("nuevo_registro"):
         })
         st.success("¡Ventana agregada!")
 
-# --- HOJA DE TRABAJO ---
+# --- VISUALIZACIÓN ---
 if st.session_state.pedido:
-    st.header("📋 Hoja de Corte y Materiales")
+    st.header("📋 Hoja de Trabajo")
     todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[], "PIERNA":[], "GANCHO":[], "ZOCALO":[]}
     
     col_lista, col_opti = st.columns(2)
-    
     with col_lista:
-        st.subheader("🪟 Detalle por Ventana")
         for i, v in enumerate(st.session_state.pedido):
             with st.expander(f"VENTANA #{i+1} - {v['medida']}"):
-                st.write(f"**Vidrios:** {v['vidrio']}")
                 for n, info in v['detalles'].items():
                     st.write(f"- {info['cant']} {n}: {info['medida']:.1f} cm")
                     todos[n].extend([info['medida']] * info['cant'])
-                if st.button(f"Eliminar V-{i+1}", key=f"del_{i}"):
-                    st.session_state.pedido.pop(i)
-                    st.rerun()
+                if st.button(f"Eliminar {i+1}", key=f"del_{i}"):
+                    st.session_state.pedido.pop(i); st.rerun()
         
         pdf_bytes = generar_pdf(st.session_state.pedido, todos)
-        st.download_button("📄 Descargar Reporte PDF", pdf_bytes, "hoja_corte.pdf", "application/pdf")
+        st.download_button("📄 PDF", pdf_bytes, "hoja.pdf", "application/pdf")
 
     with col_opti:
-        st.subheader("📏 Plan de Optimización (Barras 6m)")
-        total_tiras = 0
-        for p, piezas in todos.items():
-            if piezas:
-                st.markdown(f"**Perfil: {p}**")
-                barras = optimizar_barras(piezas)
-                total_tiras += len(barras)
-                for j, b in enumerate(barras, 1):
-                    st.write(f"Tira {j}: {b} → Sobra: {600-sum(b):.1f}cm")
-        st.metric("Total Tiras de Aluminio", total_tiras)
+        if st.button("🪚 OPTIMIZAR"):
+            for p, piezas in todos.items():
+                if piezas:
+                    st.write(f"**{p}**")
+                    for j, b in enumerate(optimizar_barras(piezas), 1):
+                        st.write(f"Tira {j}: {b}")
