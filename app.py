@@ -100,8 +100,11 @@ if st.session_state.pedido:
                 if st.button(f"Eliminar", key=f"d{i}"):
                     st.session_state.pedido.pop(i); st.rerun()
         
-        pdf = generar_pdf(st.session_state.pedido, todos)
-        st.download_button("📄 Descargar PDF", pdf, "corte.pdf", "application/pdf")
+        try:
+            pdf = generar_pdf(st.session_state.pedido, todos)
+            st.download_button("📄 Descargar PDF", pdf, "corte.pdf", "application/pdf")
+        except:
+            st.info("Agregue ventanas para generar el PDF")
 
     with c_o:
         st.subheader("🪚 Optimización")
@@ -110,4 +113,4 @@ if st.session_state.pedido:
                 if piezas:
                     st.write(f"**{p}**")
                     for j, b in enumerate(optimizar_barras(piezas), 1):
-                        st.write(f"Tira {j}: {b}")
+                        st.write(f"Tira {j}: {b} - Sobra: {600-sum(b):.1f}cm")
