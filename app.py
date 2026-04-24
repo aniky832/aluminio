@@ -2,7 +2,7 @@ import streamlit as st
 import json
 from fpdf import FPDF
 
-# --- FUNCIONES ---
+# --- FUNCIONES DE APOYO ---
 def optimizar_barras(piezas, largo=600):
     if not piezas: return []
     piezas.sort(reverse=True)
@@ -31,39 +31,39 @@ def generar_pdf(pedido, todos):
         pdf.ln(5)
     return pdf.output()
 
-# --- APP ---
+# --- CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="App Linea 25 Pro", layout="wide")
 st.title("🛠️ Sistema Linea 25 Pro")
 
 if 'pedido' not in st.session_state:
     st.session_state.pedido = []
 
-# BARRA LATERAL
+# --- BARRA LATERAL (PROYECTOS) ---
 with st.sidebar:
-    st.header("📂 Proyectos")
+    st.header("📂 Gestión de Proyectos")
     if st.session_state.pedido:
         js = json.dumps(st.session_state.pedido)
-        st.download_button("📥 Guardar Proyecto", js, "proyecto.json")
+        st.download_button("📥 Guardar Proyecto (JSON)", js, "proyecto_ventanas.json")
     
-    subido = st.file_uploader("📂 Abrir Proyecto", type="json")
+    subido = st.file_uploader("📂 Abrir Proyecto Existente", type="json")
     if subido:
         st.session_state.pedido = json.load(subido)
-        st.success("¡Cargado!")
+        st.success("¡Proyecto cargado!")
     
-    if st.button("🗑️ Nuevo Proyecto"):
+    if st.button("🗑️ Iniciar Nuevo Proyecto"):
         st.session_state.pedido = []
         st.rerun()
 
-# FORMULARIO
-with st.form("main_form"):
-    st.subheader("📝 Nueva Ventana")
+# --- FORMULARIO DE ENTRADA ---
+with st.form("formulario_principal"):
+    st.subheader("📝 Agregar Nueva Ventana")
     col1, col2, col3 = st.columns(3)
-    with col1: anc = st.number_input("Ancho (cm)", min_value=0.0)
-    with col2: alt = st.number_input("Alto (cm)", min_value=0.0)
-    # LÍNEA 64 CORREGIDA:
-    with col3: hojas = st.selectbox("Hojas", options=)
+    with col1: anc = st.number_input("Ancho Total (cm)", min_value=0.0, step=0.1)
+    with col2: alt = st.number_input("Alto Total (cm)", min_value=0.0, step=0.1)
+    # LÍNEA 64 CORREGIDA: Ahora tiene los números [2, 3, 4]
+    with col3: hojas = st.selectbox("Número de Hojas", options=)
     
-    enviar = st.form_submit_button("➕ Agregar")
+    enviar = st.form_submit_button("➕ Agregar a la Lista")
 
     if enviar and anc > 0 and alt > 0:
         r = anc - 1.5
@@ -81,36 +81,41 @@ with st.form("main_form"):
                 "GANCHO": {"medida": alt-3.5, "cant": 2},
                 "ZOCALO": {"medida": z, "cant": cz}
             },
-            "vidrio": f"{hojas} de {alt-15:.1f} x {z+1.5:.1f}"
+            "vidrio": f"{hojas} vidrios de {alt-15:.1f} x {z+1.5:.1f}"
         })
+        st.success("Ventana guardada con éxito")
 
-# RESULTADOS
+# --- MOSTRAR RESULTADOS ---
 if st.session_state.pedido:
     st.divider()
     todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[], "PIERNA":[], "GANCHO":[], "ZOCALO":[]}
     
-    c_l, c_o = st.columns(2)
-    with c_l:
-        st.subheader("📋 Lista de Corte")
+    c_lista, c_opti = st.columns(2)
+    
+    with c_lista:
+        st.subheader("📋 Resumen de Cortes")
         for i, v in enumerate(st.session_state.pedido):
-            with st.expander(f"VENTANA #{i+1}"):
+            with st.expander(f"VENTANA #{i+1} - {v['medida']}"):
                 for n, info in v['detalles'].items():
-                    st.write(f"{info['cant']} {n}: {info['medida']:.1f}cm")
+                    st.write(f"**{info['cant']} {n}**: {info['medida']:.1f} cm")
                     todos[n].extend([info['medida']] * info['cant'])
-                if st.button(f"Eliminar", key=f"d{i}"):
-                    st.session_state.pedido.pop(i); st.rerun()
+                if st.button(f"Eliminar Ventana {i+1}", key=f"btn_{i}"):
+                    st.session_state.pedido.pop(i)
+                    st.rerun()
         
+        # Botón de PDF
         try:
-            pdf = generar_pdf(st.session_state.pedido, todos)
-            st.download_button("📄 Descargar PDF", pdf, "corte.pdf", "application/pdf")
+            pdf_output = generar_pdf(st.session_state.pedido, todos)
+            st.download_button("📄 Descargar Reporte PDF", pdf_output, "hoja_de_corte.pdf", "application/pdf")
         except:
-            st.info("Agregue ventanas para generar el PDF")
+            st.info("Agregue ventanas para generar el PDF.")
 
-    with c_o:
-        st.subheader("🪚 Optimización")
-        if st.button("Calcular Barras"):
+    with c_opti:
+        st.subheader("🪚 Optimización de Barras (6m)")
+        if st.button("📏 Calcular Plan de Corte"):
             for p, piezas in todos.items():
                 if piezas:
-                    st.write(f"**{p}**")
-                    for j, b in enumerate(optimizar_barras(piezas), 1):
-                        st.write(f"Tira {j}: {b} - Sobra: {600-sum(b):.1f}cm")
+                    st.markdown(f"**Perfil: {p}**")
+                    barras = optimizar_barras(piezas)
+                    for j, b in enumerate(barras, 1):
+                        st.write(f"Tira {j}: {b} → Sobra: {600-sum(b):.1f}cm")
