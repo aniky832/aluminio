@@ -38,7 +38,7 @@ st.title("🛠️ Sistema Linea 25 Pro")
 if 'pedido' not in st.session_state:
     st.session_state.pedido = []
 
-# --- BARRA LATERAL (PROYECTOS) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.header("📂 Gestión de Proyectos")
     if st.session_state.pedido:
@@ -60,8 +60,9 @@ with st.form("formulario_principal"):
     col1, col2, col3 = st.columns(3)
     with col1: anc = st.number_input("Ancho Total (cm)", min_value=0.0, step=0.1)
     with col2: alt = st.number_input("Alto Total (cm)", min_value=0.0, step=0.1)
-    # LÍNEA 64 CORREGIDA: Ahora tiene los números [2, 3, 4]
-    with col3: hojas = st.selectbox("Número de Hojas", options=)
+    
+    # LÍNEA CORREGIDA (REVISAR QUE TENGA LOS NÚMEROS):
+    with col3: hojas = st.selectbox("Número de Hojas", options= 2, 3, 4)
     
     enviar = st.form_submit_button("➕ Agregar a la Lista")
 
@@ -103,12 +104,11 @@ if st.session_state.pedido:
                     st.session_state.pedido.pop(i)
                     st.rerun()
         
-        # Botón de PDF
         try:
             pdf_output = generar_pdf(st.session_state.pedido, todos)
             st.download_button("📄 Descargar Reporte PDF", pdf_output, "hoja_de_corte.pdf", "application/pdf")
         except:
-            st.info("Agregue ventanas para generar el PDF.")
+            st.info("Agregue ventanas para habilitar el PDF.")
 
     with c_opti:
         st.subheader("🪚 Optimización de Barras (6m)")
