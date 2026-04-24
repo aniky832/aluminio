@@ -120,7 +120,7 @@ if st.session_state.pedido:
         "PIERNA": [],
         "GANCHO": [],
         "ZOCALO": [],
-        "VIDRIO": []
+        "VIDRIOS": []
     }
 
     c_lista, c_opti = st.columns(2)
