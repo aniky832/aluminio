@@ -25,30 +25,26 @@ with st.form("mi_formulario"):
     with col2: alto = st.number_input("Alto total (cm)", min_value=0.0, step=0.1)
     
     opciones = [2, 3, 4]
-    div = st.selectbox("Numero de divisiones", opciones)
+    div = st.selectbox("Número de divisiones", opciones)
     
     enviar = st.form_submit_button("➕ Agregar Ventana")
 
     if enviar:
         if ancho > 0 and alto > 0:
             jamba = alto
-            # La RIEL siempre son 2 piezas (superior e inferior) al ancho total menos descuento
-            riel = ancho - 1.5 
+            medida_riel = ancho - 1.5 
             pierna, gancho = alto - 3.5, alto - 3.5
             
-            # Ajuste de cálculos según divisiones para Zócalos y Piernas
-            if div == 2: 
-                zocalo, c_z, c_p = (ancho-16)/2, 4, 2
-            elif div == 3: 
-                zocalo, c_z, c_p = (ancho-26.5)/3, 6, 4
-            else: 
-                zocalo, c_z, c_p = (ancho-30)/4, 8, 6
+            if div == 2: zocalo, c_z, c_p = (ancho-16)/2, 4, 2
+            elif div == 3: zocalo, c_z, c_p = (ancho-26.5)/3, 6, 4
+            else: zocalo, c_z, c_p = (ancho-30)/4, 8, 6
             
             st.session_state.pedido.append({
                 "medida": f"{ancho}x{alto}", "div": div,
                 "detalles": {
                     "JAMBA": {"medida": jamba, "cant": 2},
-                    "RIEL": {"medida": riel, "cant": 2}, # Siempre 2 por ventana
+                    "RIEL SUPERIOR": {"medida": medida_riel, "cant": 1},
+                    "RIEL INFERIOR": {"medida": medida_riel, "cant": 1},
                     "PIERNA": {"medida": pierna, "cant": c_p},
                     "GANCHO": {"medida": gancho, "cant": 2},
                     "ZOCALO": {"medida": zocalo, "cant": c_z}
@@ -62,7 +58,9 @@ if st.session_state.pedido:
         st.session_state.pedido = []; st.rerun()
 
     st.header("📋 1. Hoja de Corte")
-    todos = {"JAMBA":[], "RIEL":[], "PIERNA":[], "GANCHO":[], "ZOCALO":[]}
+    # Diccionario actualizado con los dos tipos de rieles
+    todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[], "PIERNA":[], "GANCHO":[], "ZOCALO":[]}
+    
     for i, v in enumerate(st.session_state.pedido, 1):
         with st.expander(f"VENTANA #{i} - {v['medida']} ({v['div']} hojas)"):
             st.write(f"Vidrios: {v['vidrio']}")
