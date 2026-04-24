@@ -39,8 +39,8 @@ def generar_pdf(pedido, todos):
 
         pdf.ln(5)
 
-    # CORRECCIÓN AQUÍ: Para que funcione en Streamlit Cloud
-    return pdf.output()
+    return pdf.output(dest='S').encode('latin1')
+
 
 # --- CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="App Linea 25 Pro", layout="wide")
@@ -79,7 +79,7 @@ with st.form("formulario_principal"):
         alt = st.number_input("Alto Total (cm)", min_value=0.0, step=0.1)
 
     with col3:
-        hojas = st.selectbox("Número de Hojas", options=)
+        hojas = st.selectbox("Número de Hojas", options=[2, 3, 4])
 
     enviar = st.form_submit_button("➕ Agregar a la Lista")
 
@@ -142,14 +142,12 @@ if st.session_state.pedido:
                 # ✅ VIDRIO
                 vid = v["vidrio"]
                 st.write(f"**{vid['cant']} VIDRIO**: {vid['alto']:.1f} x {vid['ancho']:.1f} cm")
-                # El vidrio no suele optimizarse como barras, pero lo guardamos por si acaso
                 todos["VIDRIO"].extend([vid['ancho']] * vid['cant'])
 
                 if st.button(f"Eliminar Ventana {i+1}", key=f"btn_{i}"):
                     st.session_state.pedido.pop(i)
                     st.rerun()
 
-        # Botón PDF con manejo de errores
         try:
             pdf_output = generar_pdf(st.session_state.pedido, todos)
             st.download_button(
@@ -158,7 +156,7 @@ if st.session_state.pedido:
                 "hoja_de_corte.pdf",
                 "application/pdf"
             )
-        except Exception as e:
+        except:
             st.info("Agregue ventanas para habilitar el PDF.")
 
     with c_opti:
@@ -166,7 +164,7 @@ if st.session_state.pedido:
 
         if st.button("📏 Calcular Plan de Corte"):
             for p, piezas in todos.items():
-                if piezas and p != "VIDRIO": # No optimizamos vidrios en tiras de 6m
+                if piezas:
                     st.markdown(f"**Perfil: {p}**")
                     barras = optimizar_barras(piezas)
 
