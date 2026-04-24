@@ -31,7 +31,8 @@ def generar_pdf(pedido, todos):
         pdf.cell(190, 10, f"VENTANA - {v['medida']} ({v['div']} hojas)", ln=True)
 
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(190, 7, f"Vidrios: {v['vidrio']}", ln=True)
+        vid = v["vidrio"]
+        pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {vid['alto']:.1f} x {vid['ancho']:.1f} cm", ln=True)
 
         for n, info in v['detalles'].items():
             pdf.cell(190, 7, f"- {info['cant']} {n}: {info['medida']:.1f} cm", ln=True)
@@ -65,7 +66,7 @@ with st.sidebar:
         st.session_state.pedido = []
         st.rerun()
 
-# --- FORMULARIO DE ENTRADA ---
+# --- FORMULARIO ---
 with st.form("formulario_principal"):
     st.subheader("📝 Agregar Nueva Ventana")
 
@@ -77,7 +78,6 @@ with st.form("formulario_principal"):
     with col2:
         alt = st.number_input("Alto Total (cm)", min_value=0.0, step=0.1)
 
-    # ✅ CORREGIDO AQUÍ
     with col3:
         hojas = st.selectbox("Número de Hojas", options=[2, 3, 4])
 
@@ -105,15 +105,15 @@ with st.form("formulario_principal"):
                 "ZOCALO": {"medida": z, "cant": cz}
             },
             "vidrio": {
-    "ancho": z + 1.5,
-    "alto": alt - 15,
-    "cant": hojas
-}
+                "ancho": z + 1.5,
+                "alto": alt - 15,
+                "cant": hojas
+            }
         })
 
         st.success("Ventana guardada con éxito")
 
-# --- MOSTRAR RESULTADOS ---
+# --- RESULTADOS ---
 if st.session_state.pedido:
     st.divider()
 
@@ -134,9 +134,15 @@ if st.session_state.pedido:
 
         for i, v in enumerate(st.session_state.pedido):
             with st.expander(f"VENTANA #{i+1} - {v['medida']}"):
+
                 for n, info in v['detalles'].items():
                     st.write(f"**{info['cant']} {n}**: {info['medida']:.1f} cm")
                     todos[n].extend([info['medida']] * info['cant'])
+
+                # ✅ VIDRIO
+                vid = v["vidrio"]
+                st.write(f"**{vid['cant']} VIDRIO**: {vid['alto']:.1f} x {vid['ancho']:.1f} cm")
+                todos["VIDRIO"].extend([vid['ancho']] * vid['cant'])
 
                 if st.button(f"Eliminar Ventana {i+1}", key=f"btn_{i}"):
                     st.session_state.pedido.pop(i)
