@@ -119,7 +119,7 @@ if st.session_state.pedido:
         "RIEL INFERIOR": [],
         "PIERNA": [],
         "GANCHO": [],
-        "ZOCALO": []
+        "ZOCALO": [],
         "VIDRIO": []
     }
 
