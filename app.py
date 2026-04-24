@@ -56,25 +56,25 @@ if 'pedido' not in st.session_state:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("💾 Gestión")
+    st.header("💾 Gestión de Archivos")
     if st.session_state.pedido:
         json_str = json.dumps(st.session_state.pedido)
-        st.download_button("📥 Descargar Proyecto", json_str, file_name="proyecto.json")
+        st.download_button("📥 Descargar Proyecto (.json)", json_str, file_name="proyecto.json")
     
     archivo_cargado = st.file_uploader("📂 Cargar Proyecto", type="json")
     if archivo_cargado:
         st.session_state.pedido = json.load(archivo_cargado)
         st.success("¡Cargado!")
 
-# --- FORMULARIO (Aquí estaba el error) ---
+# --- FORMULARIO DE ENTRADA ---
 with st.form("mi_formulario"):
     st.subheader("📝 Nueva Ventana")
     col1, col2 = st.columns(2)
     with col1: ancho = st.number_input("Ancho (cm)", min_value=0.0)
     with col2: alto = st.number_input("Alto (cm)", min_value=0.0)
     
-    # AQUÍ ESTÁ LA CORRECCIÓN: añadí [2, 3, 4]
-    div = st.selectbox("Número de divisiones",) 
+    # CORRECCIÓN AQUÍ: He añadido las opciones [2, 3, 4]
+    div = st.selectbox("Número de divisiones",)
     
     enviar = st.form_submit_button("➕ Agregar al Pedido")
 
@@ -94,10 +94,11 @@ with st.form("mi_formulario"):
                 "GANCHO": {"medida": alto-3.5, "cant": 2},
                 "ZOCALO": {"medida": zocalo, "cant": c_z}
             },
-            "vidrio": f"{div} vidrios de {alto-15} x {zocalo+1.5:.1f}"
+            "vidrio": f"{div} vidrios de {alto-15:.1f} x {zocalo+1.5:.1f}"
         })
+        st.success("Ventana agregada")
 
-# --- MOSTRAR RESULTADOS ---
+# --- VISUALIZACIÓN ---
 if st.session_state.pedido:
     st.header("📋 Hoja de Trabajo")
     todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[], "PIERNA":[], "GANCHO":[], "ZOCALO":[]}
@@ -108,21 +109,21 @@ if st.session_state.pedido:
                 st.write(f"- {info['cant']} {n}: {info['medida']:.1f} cm")
                 if n in todos:
                     todos[n].extend([info['medida']] * info['cant'])
-            if st.button(f"🗑️ Eliminar Ventana {i+1}", key=f"btn_del_{i}"):
+            if st.button(f"🗑️ Eliminar Ventana {i+1}", key=f"del_{i}"):
                 st.session_state.pedido.pop(i)
                 st.rerun()
 
-    # Botones para PDF y Borrar todo
+    # Botones finales
     col_a, col_b = st.columns(2)
     with col_a:
         try:
-            pdf_data = generar_pdf(st.session_state.pedido, todos)
-            st.download_button("📄 Descargar PDF", pdf_data, file_name="hoja_corte.pdf", mime="application/pdf")
-        except Exception as e:
-            st.error("Espera un momento a que el PDF se prepare...")
+            pdf_bytes = generar_pdf(st.session_state.pedido, todos)
+            st.download_button("📄 Descargar PDF", pdf_bytes, "hoja_corte.pdf", "application/pdf")
+        except:
+            st.warning("Añade una ventana para habilitar el PDF.")
 
     with col_b:
-        if st.button("🔴 Borrar Todo el Pedido"):
+        if st.button("🔴 Borrar Todo"):
             st.session_state.pedido = []
             st.rerun()
 
@@ -131,6 +132,5 @@ if st.session_state.pedido:
         for p, piezas in todos.items():
             if piezas:
                 st.subheader(f"🔹 {p}")
-                barras = optimizar_barras(piezas)
-                for j, b in enumerate(barras, 1):
+                for j, b in enumerate(optimizar_barras(piezas), 1):
                     st.write(f"Tira {j}: {b} - Sobra: {600-sum(b):.1f}cm")
