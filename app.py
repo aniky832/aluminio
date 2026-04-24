@@ -73,7 +73,7 @@ with st.form("mi_formulario"):
     with col1: ancho = st.number_input("Ancho (cm)", min_value=0.0)
     with col2: alto = st.number_input("Alto (cm)", min_value=0.0)
     
-    # CORRECCIÓN AQUÍ: He añadido las opciones [2, 3, 4]
+    # ESTA ES LA LÍNEA QUE CORREGIMOS:
     div = st.selectbox("Número de divisiones",)
     
     enviar = st.form_submit_button("➕ Agregar al Pedido")
