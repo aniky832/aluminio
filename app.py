@@ -103,8 +103,8 @@ with st.form("formulario_principal"):
                 "PIERNA": {"medida": alt - 3.5, "cant": cp},
                 "GANCHO": {"medida": alt - 3.5, "cant": 2},
                 "ZOCALO": {"medida": z, "cant": cz}
-         "vidrio": f"{hojas} vidrios de {alt - 15:.1f} x {z + 1.5:.1f}" 
-            },   
+            },
+            "vidrio": f"{hojas} vidrios de {alt - 15:.1f} x {z + 1.5:.1f}"
         })
 
         st.success("Ventana guardada con éxito")
@@ -119,8 +119,7 @@ if st.session_state.pedido:
         "RIEL INFERIOR": [],
         "PIERNA": [],
         "GANCHO": [],
-        "ZOCALO": [],
-        "VIDRIOS": []
+        "ZOCALO": []
     }
 
     c_lista, c_opti = st.columns(2)
