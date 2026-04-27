@@ -4,8 +4,11 @@ from fpdf import FPDF
 import math
 from datetime import datetime
 
-# ---------------- FUNCIONES ----------------
+# ---------- UTIL ----------
+def r(x):
+    return round(x, 1)
 
+# ---------- FUNCIONES ----------
 def optimizar_barras(piezas, largo=600):
     piezas = sorted(piezas, reverse=True)
     barras = []
@@ -33,10 +36,10 @@ def generar_pdf(pedido):
 
         pdf.set_font("Helvetica", "", 10)
         vid = v["vidrio"]
-        pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {vid['alto']:.1f} x {vid['ancho']:.1f}", ln=True)
+        pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {r(vid['alto'])} x {r(vid['ancho'])}", ln=True)
 
         for n, info in v['detalles'].items():
-            pdf.cell(190, 7, f"- {info['cant']} {n}: {info['medida']:.1f}", ln=True)
+            pdf.cell(190, 7, f"- {info['cant']} {n}: {r(info['medida'])}", ln=True)
 
         pdf.ln(5)
 
@@ -46,7 +49,7 @@ def generar_pdf_optimizacion(todos):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "OPTIMIZACION", ln=True, align="C")
+    pdf.cell(190, 10, "OPTIMIZACION DE MATERIALES", ln=True, align="C")
     pdf.ln(10)
 
     for p, piezas in todos.items():
@@ -58,7 +61,11 @@ def generar_pdf_optimizacion(todos):
             pdf.set_font("Helvetica", "", 10)
 
             for i, b in enumerate(barras, 1):
-                pdf.cell(190, 6, f"Tira {i}: {b} | sobra {600 - sum(b):.1f}", ln=True)
+                pdf.cell(
+                    190, 6,
+                    f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))} cm",
+                    ln=True
+                )
 
             pdf.ln(4)
 
@@ -76,8 +83,7 @@ def calcular_materiales(todos):
 
     return resumen
 
-# ---------------- PRECIOS ----------------
-
+# ---------- PRECIOS ----------
 PRECIOS_ALUMINIO = {
     "MT": {"RIEL SUPERIOR":187,"RIEL INFERIOR":187,"ZOCALO":177,"GANCHO":171,"JAMBA":159,"PIERNA":171},
     "CH": {"RIEL SUPERIOR":191,"RIEL INFERIOR":191,"ZOCALO":180,"GANCHO":171,"JAMBA":160,"PIERNA":171},
@@ -93,8 +99,7 @@ PRECIOS_VIDRIO = {
     "Estipoly Incoloro": 320
 }
 
-# ---------------- APP ----------------
-
+# ---------- APP ----------
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
@@ -120,8 +125,7 @@ with st.sidebar:
     st.divider()
     modo = st.radio("Modo", ["Producción", "💰 Cotización"])
 
-# ---------------- PRODUCCIÓN ----------------
-
+# ---------- PRODUCCIÓN ----------
 if modo == "Producción":
 
     with st.form("form"):
@@ -133,24 +137,24 @@ if modo == "Producción":
         ok = st.form_submit_button("Agregar")
 
         if ok and anc > 0 and alt > 0:
-            r = anc - 1.5
+            riel = anc - 1.5
 
             if hojas == 2:
-                z, cz, cp = (anc - 16) / 2, 4, 2
+                z, cz, cp = (anc - 16)/2, 4, 2
             elif hojas == 3:
-                z, cz, cp = (anc - 26.5) / 3, 6, 4
+                z, cz, cp = (anc - 26.5)/3, 6, 4
             else:
-                z, cz, cp = (anc - 30) / 4, 8, 6
+                z, cz, cp = (anc - 30)/4, 8, 6
 
             st.session_state.pedido.append({
                 "medida": f"{anc}x{alt}",
                 "div": hojas,
                 "detalles": {
                     "JAMBA": {"medida": alt, "cant": 2},
-                    "RIEL SUPERIOR": {"medida": r, "cant": 1},
-                    "RIEL INFERIOR": {"medida": r, "cant": 1},
-                    "PIERNA": {"medida": alt - 3.5, "cant": cp},
-                    "GANCHO": {"medida": alt - 3.5, "cant": 2},
+                    "RIEL SUPERIOR": {"medida": riel, "cant": 1},
+                    "RIEL INFERIOR": {"medida": riel, "cant": 1},
+                    "PIERNA": {"medida": alt-3.5, "cant": cp},
+                    "GANCHO": {"medida": alt-3.5, "cant": 2},
                     "ZOCALO": {"medida": z, "cant": cz}
                 },
                 "vidrio": {"ancho": z+1.5, "alto": alt-15, "cant": hojas}
@@ -168,27 +172,22 @@ if modo == "Producción":
         if st.button("Calcular Optimización"):
             for p, piezas in todos.items():
                 if p != "VIDRIO" and piezas:
-                    st.write(p)
-                    for i,b in enumerate(optimizar_barras(piezas),1):
-                        st.write(f"Tira {i}: {b}")
+                    st.write(f"--- {p} ---")
+                    for i, b in enumerate(optimizar_barras(piezas),1):
+                        st.write(f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))} cm")
 
-        pdf = generar_pdf(st.session_state.pedido)
-        st.download_button("PDF Ventanas", pdf, "ventanas.pdf")
-
-        pdf2 = generar_pdf_optimizacion(todos)
-        st.download_button("PDF Optimización", pdf2, "optimizacion.pdf")
+        st.download_button("PDF Ventanas", generar_pdf(st.session_state.pedido), "ventanas.pdf")
+        st.download_button("PDF Optimización", generar_pdf_optimizacion(todos), "optimizacion.pdf")
 
         resumen = calcular_materiales(todos)
-        st.subheader("Material a Comprar")
 
+        st.subheader("Material a Comprar")
         for k,v in resumen.items():
             if k != "VIDRIO":
                 st.write(f"{k}: {v} barras")
-
         st.write(f"VIDRIO: {resumen['VIDRIO']} planchas")
 
-# ---------------- COTIZACIÓN ----------------
-
+# ---------- COTIZACIÓN ----------
 elif modo == "💰 Cotización":
 
     st.title("💰 Cotización Profesional")
@@ -203,7 +202,7 @@ elif modo == "💰 Cotización":
 
     if st.button("Agregar Ventana"):
         if anc>0 and alt>0:
-            r = anc-1.5
+            riel = anc-1.5
 
             if hojas==2:
                 z,cz,cp=(anc-16)/2,4,2
@@ -215,8 +214,8 @@ elif modo == "💰 Cotización":
             st.session_state.cotizacion.append({
                 "detalles":{
                     "JAMBA":{"medida":alt,"cant":2},
-                    "RIEL SUPERIOR":{"medida":r,"cant":1},
-                    "RIEL INFERIOR":{"medida":r,"cant":1},
+                    "RIEL SUPERIOR":{"medida":riel,"cant":1},
+                    "RIEL INFERIOR":{"medida":riel,"cant":1},
                     "PIERNA":{"medida":alt-3.5,"cant":cp},
                     "GANCHO":{"medida":alt-3.5,"cant":2},
                     "ZOCALO":{"medida":z,"cant":cz}
@@ -258,8 +257,7 @@ elif modo == "💰 Cotización":
 
         st.success(f"TOTAL: {total:.2f} Bs")
 
-        if st.button("PDF Cotización"):
-
+        if st.button("Generar PDF"):
             pdf=FPDF()
             pdf.add_page()
 
@@ -279,4 +277,11 @@ elif modo == "💰 Cotización":
             pdf.set_font("Helvetica","B",12)
             pdf.cell(190,10,f"TOTAL: {total:.2f} Bs",ln=True)
 
-            st.download_button("Descargar PDF", pdf.output(dest='S').encode('latin1'), "cotizacion.pdf")
+            pdf_bytes = pdf.output(dest='S').encode('latin1')
+
+            st.download_button(
+                "⬇ Descargar PDF",
+                data=pdf_bytes,
+                file_name="cotizacion.pdf",
+                mime="application/pdf"
+            )
