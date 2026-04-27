@@ -19,63 +19,18 @@ PRECIOS_VIDRIO = {
     "Estipoly Incoloro": 320
 }
 
-# --- FUNCIONES ORIGINALES ---
+# --- FUNCIONES ---
 def optimizar_barras(piezas, largo=600):
-    if not piezas: return []
-    piezas.sort(reverse=True)
+    piezas = sorted(piezas, reverse=True)
     barras = []
     for p in piezas:
-        puesto = False
         for b in barras:
             if sum(b) + p <= largo:
-                b.append(p); puesto = True; break
-        if not puesto: barras.append([p])
+                b.append(p)
+                break
+        else:
+            barras.append([p])
     return barras
-
-def generar_pdf(pedido, todos):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "HOJA DE TRABAJO - LINEA 25", ln=True, align="C")
-    pdf.ln(10)
-
-    for v in pedido:
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(190, 10, f"VENTANA - {v['medida']} ({v['div']} hojas)", ln=True)
-
-        pdf.set_font("Helvetica", "", 10)
-        vid = v["vidrio"]
-        pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {vid['alto']:.1f} x {vid['ancho']:.1f} cm", ln=True)
-
-        for n, info in v['detalles'].items():
-            pdf.cell(190, 7, f"- {info['cant']} {n}: {info['medida']:.1f} cm", ln=True)
-
-        pdf.ln(5)
-
-    return pdf.output(dest='S').encode('latin1')
-
-def generar_pdf_optimizacion(todos):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "OPTIMIZACION DE MATERIALES", ln=True, align="C")
-    pdf.ln(10)
-
-    for p, piezas in todos.items():
-        if p != "VIDRIO" and piezas:
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(190, 8, f"{p}", ln=True)
-
-            barras = optimizar_barras(piezas)
-            pdf.set_font("Helvetica", "", 10)
-
-            for i, b in enumerate(barras, 1):
-                pdf.cell(190, 6, f"Tira {i}: {b} | Sobra: {600 - sum(b):.1f} cm", ln=True)
-
-            pdf.cell(190, 6, f"TOTAL BARRAS: {len(barras)}", ln=True)
-            pdf.ln(4)
-
-    return pdf.output(dest='S').encode('latin1')
 
 def calcular_materiales(todos):
     resumen = {}
@@ -83,71 +38,71 @@ def calcular_materiales(todos):
         if p != "VIDRIO" and piezas:
             resumen[p] = len(optimizar_barras(piezas))
 
-    total_area = 0
-    for v in todos["VIDRIO"]:
-        total_area += v["ancho"] * v["alto"] * v["cant"]
-
-    planchas = total_area / (330 * 214)
-    resumen["VIDRIO"] = math.ceil(planchas)
-
+    total_area = sum(v["ancho"] * v["alto"] * v["cant"] for v in todos["VIDRIO"])
+    resumen["VIDRIO"] = math.ceil(total_area / (330 * 214))
     return resumen
 
-# --- APP ---
+# --- UI ---
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
 tab1, tab2 = st.tabs(["Producción", "💰 Cotizar"])
 
-# ================= PRODUCCIÓN (TU SISTEMA ORIGINAL) =================
+# ================= PRODUCCIÓN =================
 with tab1:
 
     if "pedido" not in st.session_state:
         st.session_state.pedido = []
 
-    with st.form("form"):
-        c1, c2, c3 = st.columns(3)
-        anc = c1.number_input("Ancho", 0.0)
-        alt = c2.number_input("Alto", 0.0)
-        hojas = c3.selectbox("Hojas", [2,3,4])
+    col1, col2, col3 = st.columns(3)
+    anc = col1.number_input("Ancho", 0.0)
+    alt = col2.number_input("Alto", 0.0)
+    hojas = col3.selectbox("Hojas", [2,3,4])
 
-        if st.form_submit_button("Agregar"):
-            if anc > 0 and alt > 0:
-                r = anc - 1.5
-                if hojas == 2:
-                    z, cz, cp = (anc-16)/2, 4, 2
-                elif hojas == 3:
-                    z, cz, cp = (anc-26.5)/3, 6, 4
-                else:
-                    z, cz, cp = (anc-30)/4, 8, 6
+    if st.button("Agregar Ventana"):
+        if anc > 0 and alt > 0:
+            r = anc - 1.5
+            if hojas == 2:
+                z, cz, cp = (anc-16)/2, 4, 2
+            elif hojas == 3:
+                z, cz, cp = (anc-26.5)/3, 6, 4
+            else:
+                z, cz, cp = (anc-30)/4, 8, 6
 
-                st.session_state.pedido.append({
-                    "medida": f"{anc}x{alt}",
-                    "div": hojas,
-                    "detalles": {
-                        "JAMBA":{"medida":alt,"cant":2},
-                        "RIEL SUPERIOR":{"medida":r,"cant":1},
-                        "RIEL INFERIOR":{"medida":r,"cant":1},
-                        "PIERNA":{"medida":alt-3.5,"cant":cp},
-                        "GANCHO":{"medida":alt-3.5,"cant":2},
-                        "ZOCALO":{"medida":z,"cant":cz}
-                    },
-                    "vidrio":{
-                        "ancho":z+1.5,
-                        "alto":alt-15,
-                        "cant":hojas
-                    }
-                })
+            st.session_state.pedido.append({
+                "medida": f"{anc}x{alt}",
+                "detalles": {
+                    "JAMBA":{"medida":alt,"cant":2},
+                    "RIEL SUPERIOR":{"medida":r,"cant":1},
+                    "RIEL INFERIOR":{"medida":r,"cant":1},
+                    "PIERNA":{"medida":alt-3.5,"cant":cp},
+                    "GANCHO":{"medida":alt-3.5,"cant":2},
+                    "ZOCALO":{"medida":z,"cant":cz}
+                },
+                "vidrio":{
+                    "ancho":z+1.5,
+                    "alto":alt-15,
+                    "cant":hojas
+                }
+            })
 
     if st.session_state.pedido:
         todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[],
                  "PIERNA":[], "GANCHO":[], "ZOCALO":[], "VIDRIO":[]}
 
-        st.subheader("Resumen de Cortes")
+        st.subheader("Resumen")
 
-        for v in st.session_state.pedido:
+        for i, v in enumerate(st.session_state.pedido):
+            st.write(v["medida"])
+
             for n, info in v["detalles"].items():
                 todos[n] += [info["medida"]] * info["cant"]
+
             todos["VIDRIO"].append(v["vidrio"])
+
+            if st.button(f"Eliminar {i}", key=f"del_{i}"):
+                st.session_state.pedido.pop(i)
+                st.rerun()
 
         if st.button("Calcular Optimización"):
             for p, piezas in todos.items():
@@ -166,21 +121,21 @@ with tab1:
 
         st.write(f"VIDRIO: {resumen['VIDRIO']} planchas")
 
-# ================= COTIZAR (NUEVO) =================
+# ================= COTIZAR =================
 with tab2:
 
-    st.subheader("💰 Cotización Real")
+    if "cotizacion" not in st.session_state:
+        st.session_state.cotizacion = []
 
-    color_al = st.selectbox("Color Aluminio", list(PRECIOS_ALUMINIO.keys()))
-    color_vid = st.selectbox("Color Vidrio", list(PRECIOS_VIDRIO.keys()))
+    st.subheader("Agregar Ventana a Cotización")
 
-    anc = st.number_input("Ancho (cm)", 0.0)
-    alt = st.number_input("Alto (cm)", 0.0)
-    hojas = st.selectbox("Hojas", [2,3,4])
+    c1, c2, c3 = st.columns(3)
+    anc = c1.number_input("Ancho (cm)", 0.0, key="c_anc")
+    alt = c2.number_input("Alto (cm)", 0.0, key="c_alt")
+    hojas = c3.selectbox("Hojas", [2,3,4], key="c_hojas")
 
-    if st.button("Calcular Cotización"):
+    if st.button("➕ Agregar"):
         if anc > 0 and alt > 0:
-
             r = anc - 1.5
 
             if hojas == 2:
@@ -190,47 +145,59 @@ with tab2:
             else:
                 z, cz, cp = (anc - 30) / 4, 8, 6
 
-            detalles = {
-                "JAMBA": {"medida": alt, "cant": 2},
-                "RIEL SUPERIOR": {"medida": r, "cant": 1},
-                "RIEL INFERIOR": {"medida": r, "cant": 1},
-                "PIERNA": {"medida": alt - 3.5, "cant": cp},
-                "GANCHO": {"medida": alt - 3.5, "cant": 2},
-                "ZOCALO": {"medida": z, "cant": cz}
-            }
+            st.session_state.cotizacion.append({
+                "detalles": {
+                    "JAMBA": {"medida": alt, "cant": 2},
+                    "RIEL SUPERIOR": {"medida": r, "cant": 1},
+                    "RIEL INFERIOR": {"medida": r, "cant": 1},
+                    "PIERNA": {"medida": alt - 3.5, "cant": cp},
+                    "GANCHO": {"medida": alt - 3.5, "cant": 2},
+                    "ZOCALO": {"medida": z, "cant": cz}
+                },
+                "vidrio": {
+                    "ancho": z + 1.5,
+                    "alto": alt - 15,
+                    "cant": hojas
+                }
+            })
+
+    color_al = st.selectbox("Color Aluminio", list(PRECIOS_ALUMINIO.keys()))
+    color_vid = st.selectbox("Color Vidrio", list(PRECIOS_VIDRIO.keys()))
+
+    if st.session_state.cotizacion:
+
+        todos = {"JAMBA":[], "RIEL SUPERIOR":[], "RIEL INFERIOR":[],
+                 "PIERNA":[], "GANCHO":[], "ZOCALO":[], "VIDRIO":[]}
+
+        for v in st.session_state.cotizacion:
+            for n, info in v["detalles"].items():
+                todos[n] += [info["medida"]] * info["cant"]
+            todos["VIDRIO"].append(v["vidrio"])
+
+        if st.button("💰 Calcular Cotización"):
+
+            materiales = calcular_materiales(todos)
 
             total_al = 0
             st.subheader("Aluminio")
 
-            for p, info in detalles.items():
-                piezas = [info["medida"]] * info["cant"]
-                barras = optimizar_barras(piezas)
-                cantidad = len(barras)
+            for p, barras in materiales.items():
+                if p != "VIDRIO":
+                    precio = PRECIOS_ALUMINIO[color_al][p]
+                    subtotal = barras * precio
+                    total_al += subtotal
+                    st.write(f"{p}: {barras} x {precio} = {subtotal} Bs")
 
-                precio = PRECIOS_ALUMINIO[color_al][p]
-                subtotal = cantidad * precio
-                total_al += subtotal
-
-                st.write(f"{p}: {cantidad} barras × {precio} = {subtotal} Bs")
-
-            st.subheader("Vidrio")
-
-            ancho_vid = z + 1.5
-            alto_vid = alt - 15
-
-            area = ancho_vid * alto_vid * hojas
-            planchas = math.ceil(area / (330 * 214))
-
+            planchas = materiales["VIDRIO"]
             total_vid = planchas * PRECIOS_VIDRIO[color_vid]
 
-            st.write(f"{planchas} planchas × {PRECIOS_VIDRIO[color_vid]} = {total_vid} Bs")
+            st.subheader("Vidrio")
+            st.write(f"{planchas} planchas x {PRECIOS_VIDRIO[color_vid]} = {total_vid} Bs")
 
             total = total_al + total_vid
 
+            st.divider()
             st.subheader("TOTAL")
             st.write(f"Aluminio: {total_al} Bs")
             st.write(f"Vidrio: {total_vid} Bs")
             st.success(f"TOTAL FINAL: {total} Bs")
-
-        else:
-            st.warning("Ingresa medidas válidas")
