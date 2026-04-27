@@ -39,7 +39,7 @@ def calcular_materiales(todos, pedido):
 
     return resumen
 
-# ---------------- PDF ----------------
+# ---------------- PDF DESCUENTOS ----------------
 def pdf_descuentos(pedido):
     pdf = FPDF()
     pdf.add_page()
@@ -62,7 +62,7 @@ def pdf_descuentos(pedido):
 
     return pdf.output(dest='S').encode('latin1')
 
-
+# ---------------- PDF OPTIMIZACION ----------------
 def pdf_optimizacion(todos):
     pdf = FPDF()
     pdf.add_page()
@@ -83,6 +83,40 @@ def pdf_optimizacion(todos):
 
             pdf.cell(190, 6, f"TOTAL BARRAS: {len(barras)}", ln=True)
             pdf.ln(4)
+
+    return pdf.output(dest='S').encode('latin1')
+
+# ---------------- PDF COTIZACION ----------------
+def pdf_cotizacion_m2(pedido, cliente, precio_m2):
+    from datetime import datetime
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(190, 10, "COTIZACION", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(190, 6, f"Cliente: {cliente}", ln=True)
+    pdf.cell(190, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
+
+    pdf.ln(5)
+
+    total_general = 0
+
+    for i, v in enumerate(pedido):
+        anc = float(v["medida"].split("x")[0])
+        alt = float(v["medida"].split("x")[1])
+
+        area = (anc * alt) / 10000
+        total = area * precio_m2
+        total_general += total
+
+        pdf.cell(190, 6, f"Ventana {i+1}: {r(anc)} x {r(alt)} → {r(total)} Bs", ln=True)
+
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(190, 10, f"TOTAL: {r(total_general)} Bs", ln=True)
 
     return pdf.output(dest='S').encode('latin1')
 
@@ -175,42 +209,6 @@ if st.session_state.pedido:
                 st.session_state.pedido.pop(i)
                 st.rerun()
 
-            if st.session_state.get(f"edit_{i}"):
-
-                na = st.number_input("Nuevo ancho", value=float(v["medida"].split("x")[0]), key=f"na{i}")
-                nh = st.number_input("Nuevo alto", value=float(v["medida"].split("x")[1]), key=f"nh{i}")
-                hj = st.selectbox("Hojas", [2,3,4], index=[2,3,4].index(v["div"]), key=f"hj{i}")
-
-                if st.button("Guardar cambios", key=f"save{i}"):
-
-                    if hj == 2:
-                        z, cz, cp = (na-16)/2, 4, 2
-                    elif hj == 3:
-                        z, cz, cp = (na-26.5)/3, 6, 4
-                    else:
-                        z, cz, cp = (na-30)/4, 8, 6
-
-                    st.session_state.pedido[i] = {
-                        "medida": f"{na}x{nh}",
-                        "div": hj,
-                        "detalles": {
-                            "JAMBA": {"medida": nh, "cant": 2},
-                            "RIEL SUPERIOR": {"medida": na-1.5, "cant": 1},
-                            "RIEL INFERIOR": {"medida": na-1.5, "cant": 1},
-                            "PIERNA": {"medida": nh-3.5, "cant": cp},
-                            "GANCHO": {"medida": nh-3.5, "cant": 2},
-                            "ZOCALO": {"medida": z, "cant": cz}
-                        },
-                        "vidrio": {
-                            "ancho": z+1.5,
-                            "alto": nh-15,
-                            "cant": hj
-                        }
-                    }
-
-                    st.session_state[f"edit_{i}"] = False
-                    st.rerun()
-
     # ---------------- OPTIMIZAR ----------------
     if st.button("🪚 Optimizar"):
         st.subheader("Resultado de Optimización")
@@ -243,3 +241,32 @@ if st.session_state.pedido:
 
     pdf2 = pdf_optimizacion(todos)
     st.download_button("📄 PDF Optimización", pdf2, "optimizacion.pdf")
+
+    # ---------------- COTIZAR ----------------
+    st.divider()
+    st.subheader("💰 Cotizar (m²)")
+
+    cliente = st.text_input("Nombre del cliente")
+    precio_m2 = st.number_input("Precio por m² (Bs)", 100.0, 1000.0, 300.0)
+
+    total_general = 0
+
+    for v in st.session_state.pedido:
+        anc = float(v["medida"].split("x")[0])
+        alt = float(v["medida"].split("x")[1])
+
+        area = (anc * alt) / 10000
+        total = area * precio_m2
+        total_general += total
+
+    st.success(f"TOTAL: {r(total_general)} Bs")
+
+    if st.button("📄 Generar PDF Cotización m²"):
+        pdf = pdf_cotizacion_m2(st.session_state.pedido, cliente, precio_m2)
+
+        st.download_button(
+            "⬇ Descargar PDF",
+            pdf,
+            "cotizacion_m2.pdf",
+            "application/pdf"
+        )
