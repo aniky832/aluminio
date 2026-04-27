@@ -2,12 +2,31 @@ import streamlit as st
 import json
 from fpdf import FPDF
 import math
+import sqlite3
 from datetime import datetime
 
-# -------- UTIL --------
+# ---------------- DB ----------------
+conn = sqlite3.connect("datos.db", check_same_thread=False)
+c = conn.cursor()
+
+c.execute("""CREATE TABLE IF NOT EXISTS proyectos(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT,
+    data TEXT
+)""")
+
+c.execute("""CREATE TABLE IF NOT EXISTS cot_m2(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente TEXT,
+    total REAL,
+    fecha TEXT
+)""")
+conn.commit()
+
+# ---------------- UTIL ----------------
 def r(x): return round(x,1)
 
-# -------- OPTIMIZAR --------
+# ---------------- OPTIMIZAR ----------------
 def optimizar_barras(piezas, largo=600):
     piezas = sorted(piezas, reverse=True)
     barras=[]
@@ -22,51 +41,7 @@ def optimizar_barras(piezas, largo=600):
             barras.append([p])
     return barras
 
-# -------- PDF --------
-def pdf_ventanas(pedido):
-    pdf=FPDF(); pdf.add_page()
-    pdf.set_font("Helvetica","B",16)
-    pdf.cell(190,10,"PRODUCCION LINEA 25",ln=True,align="C")
-
-    for v in pedido:
-        pdf.set_font("Helvetica","B",12)
-        pdf.cell(190,8,f"{v['medida']} ({v['div']} hojas)",ln=True)
-
-        pdf.set_font("Helvetica","",10)
-        for n,i in v["detalles"].items():
-            pdf.cell(190,6,f"{i['cant']} {n}: {r(i['medida'])}",ln=True)
-
-        vid=v["vidrio"]
-        pdf.cell(190,6,f"{vid['cant']} vidrio: {r(vid['alto'])} x {r(vid['ancho'])}",ln=True)
-        pdf.ln(3)
-
-    return pdf.output(dest="S").encode("latin1")
-
-def pdf_optimizacion(todos):
-    pdf=FPDF(); pdf.add_page()
-    pdf.set_font("Helvetica","B",16)
-    pdf.cell(190,10,"OPTIMIZACION",ln=True,align="C")
-
-    for p,piezas in todos.items():
-        if p!="VIDRIO" and piezas:
-            pdf.cell(190,8,p,ln=True)
-            for i,b in enumerate(optimizar_barras(piezas),1):
-                pdf.cell(190,6,f"Tira {i}: {[r(x) for x in b]} | sobra {r(600-sum(b))}",ln=True)
-
-    return pdf.output(dest="S").encode("latin1")
-
-# -------- MATERIALES --------
-def calcular_materiales(todos):
-    resumen={}
-    for p,piezas in todos.items():
-        if p!="VIDRIO":
-            resumen[p]=len(optimizar_barras(piezas))
-
-    total_area=sum(v["ancho"]*v["alto"]*v["cant"] for v in todos["VIDRIO"])
-    resumen["VIDRIO"]=math.ceil(total_area/(330*214))
-    return resumen
-
-# -------- PRECIOS --------
+# ---------------- PRECIOS ----------------
 PRECIOS_AL = {
 "MT":{"RIEL SUPERIOR":187,"RIEL INFERIOR":187,"ZOCALO":177,"GANCHO":171,"JAMBA":159,"PIERNA":171},
 "CH":{"RIEL SUPERIOR":191,"RIEL INFERIOR":191,"ZOCALO":180,"GANCHO":171,"JAMBA":160,"PIERNA":171},
@@ -77,11 +52,7 @@ PRECIOS_AL = {
 
 PRECIOS_VID={"Bronce":500,"Incoloro":490,"Gris":780,"Estipoly Incoloro":320}
 
-# -------- APP --------
-st.set_page_config(layout="wide")
-st.title("🛠️ Sistema Linea 25 PRO")
-
-# estados
+# ---------------- ESTADO ----------------
 if "pedido" not in st.session_state:
     st.session_state.pedido=[]
 if "cot_lista" not in st.session_state:
@@ -89,33 +60,31 @@ if "cot_lista" not in st.session_state:
 if "cot_m2" not in st.session_state:
     st.session_state.cot_m2=[]
 
-# -------- SIDEBAR --------
+st.set_page_config(layout="wide")
+st.title("🛠️ Sistema Línea 25 PRO")
+
+# ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.header("Proyecto")
+    modo=st.radio("Modo",["Producción","Cotización","Cotización m²","Historial"])
 
-    if st.session_state.pedido:
-        st.download_button("Guardar",json.dumps(st.session_state.pedido),"proyecto.json")
+    st.divider()
+    st.subheader("💾 Guardar proyecto")
+    nombre=st.text_input("Nombre proyecto")
 
-    file=st.file_uploader("Abrir",type="json")
-    if file:
-        st.session_state.pedido=json.load(file)
-
-    if st.button("Nuevo"):
-        st.session_state.pedido=[]
-        st.session_state.cot_lista=[]
-        st.session_state.cot_m2=[]
-        st.rerun()
-
-    modo=st.radio("Modo",["Producción","Cotización","Cotización m²"])
+    if st.button("Guardar en BD"):
+        data=json.dumps(st.session_state.pedido)
+        c.execute("INSERT INTO proyectos(nombre,data) VALUES (?,?)",(nombre,data))
+        conn.commit()
+        st.success("Guardado")
 
 # ================= PRODUCCIÓN =================
 if modo=="Producción":
 
     st.header("Producción")
 
-    anc=st.number_input("Ancho",0.0,key="p_a")
-    alt=st.number_input("Alto",0.0,key="p_h")
-    hojas=st.selectbox("Hojas",[2,3,4],key="p_hj")
+    anc=st.number_input("Ancho",0.0)
+    alt=st.number_input("Alto",0.0)
+    hojas=st.selectbox("Hojas",[2,3,4])
 
     if st.button("Agregar"):
         if hojas==2: z,cz,cp=(anc-16)/2,4,2
@@ -123,46 +92,38 @@ if modo=="Producción":
         else: z,cz,cp=(anc-30)/4,8,6
 
         st.session_state.pedido.append({
-            "medida":f"{anc}x{alt}",
-            "div":hojas,
-            "detalles":{
-                "JAMBA":{"medida":alt,"cant":2},
-                "RIEL SUPERIOR":{"medida":anc-1.5,"cant":1},
-                "RIEL INFERIOR":{"medida":anc-1.5,"cant":1},
-                "PIERNA":{"medida":alt-3.5,"cant":cp},
-                "GANCHO":{"medida":alt-3.5,"cant":2},
-                "ZOCALO":{"medida":z,"cant":cz}
-            },
-            "vidrio":{"ancho":z+1.5,"alto":alt-15,"cant":hojas}
+            "ancho":anc,"alto":alt,"hojas":hojas
         })
 
-    if st.session_state.pedido:
+    for i,v in enumerate(st.session_state.pedido):
 
-        todos={"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
+        col1,col2=st.columns(2)
 
-        for i,v in enumerate(st.session_state.pedido):
-            with st.expander(f"Ventana {i+1} - {v['medida']}"):
+        with col1:
+            st.write(f"Ventana {i+1}: {v['ancho']}x{v['alto']} ({v['hojas']})")
 
-                for n,info in v["detalles"].items():
-                    st.write(f"{info['cant']} {n}: {r(info['medida'])}")
-                    todos[n]+= [info["medida"]]*info["cant"]
+        with col2:
+            if st.button("✏️ Editar",key=f"editp{i}"):
+                st.session_state[f"edit_p_{i}"]=True
 
-                vid=v["vidrio"]
-                st.write(f"{vid['cant']} vidrio: {r(vid['alto'])} x {r(vid['ancho'])}")
-                todos["VIDRIO"].append(vid)
+            if st.button("❌ Eliminar",key=f"delp{i}"):
+                st.session_state.pedido.pop(i)
+                st.rerun()
 
-                if st.button("❌ Eliminar",key=f"prod_{i}"):
-                    st.session_state.pedido.pop(i)
-                    st.rerun()
+        if st.session_state.get(f"edit_p_{i}"):
 
-        if st.button("Optimizar"):
-            for p,piezas in todos.items():
-                if p!="VIDRIO":
-                    for i,b in enumerate(optimizar_barras(piezas),1):
-                        st.write(f"{p} Tira {i}: {[r(x) for x in b]}")
+            nuevo_a=st.number_input("Nuevo ancho",value=v["ancho"],key=f"ea{i}")
+            nuevo_h=st.number_input("Nuevo alto",value=v["alto"],key=f"eh{i}")
+            nuevo_hojas=st.selectbox("Hojas",[2,3,4],index=[2,3,4].index(v["hojas"]),key=f"ehj{i}")
 
-        st.download_button("PDF Ventanas",pdf_ventanas(st.session_state.pedido),"ventanas.pdf")
-        st.download_button("PDF Optimización",pdf_optimizacion(todos),"optimizacion.pdf")
+            if st.button("Guardar cambios",key=f"savep{i}"):
+                st.session_state.pedido[i]={
+                    "ancho":nuevo_a,
+                    "alto":nuevo_h,
+                    "hojas":nuevo_hojas
+                }
+                st.session_state[f"edit_p_{i}"]=False
+                st.rerun()
 
 # ================= COTIZACIÓN =================
 elif modo=="Cotización":
@@ -173,60 +134,55 @@ elif modo=="Cotización":
     color_vid=st.selectbox("Color vidrio",list(PRECIOS_VID.keys()))
     ganancia=st.number_input("Ganancia %",0.0,100.0,30.0)
 
-    anc=st.number_input("Ancho",0.0,key="c_a")
-    alt=st.number_input("Alto",0.0,key="c_h")
-    hojas=st.selectbox("Hojas",[2,3,4],key="c_hj")
+    anc=st.number_input("Ancho",0.0,key="c1")
+    alt=st.number_input("Alto",0.0,key="c2")
+    hojas=st.selectbox("Hojas",[2,3,4],key="c3")
 
-    if st.button("➕ Agregar"):
-        st.session_state.cot_lista.append({
-            "ancho":anc,"alto":alt,"hojas":hojas
-        })
+    if st.button("Agregar"):
+        st.session_state.cot_lista.append({"ancho":anc,"alto":alt,"hojas":hojas})
 
-    total_final=0
+    total=0
 
     for i,v in enumerate(st.session_state.cot_lista):
 
-        st.write(f"{i+1}) {r(v['ancho'])} x {r(v['alto'])} | {v['hojas']} hojas")
+        st.write(f"{i+1}) {v['ancho']}x{v['alto']} ({v['hojas']})")
 
-        if st.button("❌ Eliminar",key=f"cot_{i}"):
+        if st.button("✏️ Editar",key=f"editc{i}"):
+            st.session_state[f"edit_c_{i}"]=True
+
+        if st.button("❌ Eliminar",key=f"delc{i}"):
             st.session_state.cot_lista.pop(i)
             st.rerun()
 
-        anc=v["ancho"]; alt=v["alto"]; hojas=v["hojas"]
+        if st.session_state.get(f"edit_c_{i}"):
 
-        if hojas==2: z,cz,cp=(anc-16)/2,4,2
-        elif hojas==3: z,cz,cp=(anc-26.5)/3,6,4
-        else: z,cz,cp=(anc-30)/4,8,6
+            na=st.number_input("Nuevo ancho",value=v["ancho"],key=f"eca{i}")
+            nh=st.number_input("Nuevo alto",value=v["alto"],key=f"ech{i}")
 
-        todos={"JAMBA":[alt]*2,"RIEL SUPERIOR":[anc-1.5],"RIEL INFERIOR":[anc-1.5],
-               "PIERNA":[alt-3.5]*cp,"GANCHO":[alt-3.5]*2,"ZOCALO":[z]*cz,
-               "VIDRIO":[{"ancho":z+1.5,"alto":alt-15,"cant":hojas}]}
+            if st.button("Guardar",key=f"savec{i}"):
+                st.session_state.cot_lista[i]["ancho"]=na
+                st.session_state.cot_lista[i]["alto"]=nh
+                st.session_state[f"edit_c_{i}"]=False
+                st.rerun()
 
-        mat=calcular_materiales(todos)
+        total+= (v["ancho"]*v["alto"])/10000*300
 
-        subtotal=0
-        for p,b in mat.items():
-            if p!="VIDRIO":
-                subtotal+=b*PRECIOS_AL[color_al][p]
+    total=total+(total*ganancia/100)
 
-        subtotal+=mat["VIDRIO"]*PRECIOS_VID[color_vid]
-        total_final+=subtotal
-
-    total_final=total_final+(total_final*ganancia/100)
-
-    if total_final>0:
-        st.success(f"TOTAL: {r(total_final)} Bs")
+    if total>0:
+        st.success(f"TOTAL: {r(total)} Bs")
 
 # ================= COTIZACIÓN m² =================
 elif modo=="Cotización m²":
 
     st.header("Cotización m²")
 
+    cliente=st.text_input("Cliente")
     precio=st.number_input("Precio m²",100.0,1000.0,300.0)
 
-    anc=st.number_input("Ancho",0.0,key="m2_a")
-    alt=st.number_input("Alto",0.0,key="m2_h")
-    hojas=st.selectbox("Hojas",[2,3,4])
+    anc=st.number_input("Ancho",0.0,key="m1")
+    alt=st.number_input("Alto",0.0,key="m2")
+    hojas=st.selectbox("Hojas",[2,3,4],key="m3")
 
     if st.button("Agregar m2"):
         area=(anc*alt)/10000
@@ -239,13 +195,49 @@ elif modo=="Cotización m²":
 
     for i,v in enumerate(st.session_state.cot_m2):
 
-        st.write(f"{i+1}) {r(v['ancho'])} x {r(v['alto'])} | {v['hojas']} hojas → {r(v['total'])}")
+        st.write(f"{i+1}) {v['ancho']}x{v['alto']} → {r(v['total'])}")
 
-        if st.button("❌ Eliminar",key=f"m2_{i}"):
+        if st.button("✏️ Editar",key=f"editm{i}"):
+            st.session_state[f"edit_m_{i}"]=True
+
+        if st.button("❌ Eliminar",key=f"delm{i}"):
             st.session_state.cot_m2.pop(i)
             st.rerun()
+
+        if st.session_state.get(f"edit_m_{i}"):
+
+            na=st.number_input("Nuevo ancho",value=v["ancho"],key=f"ema{i}")
+            nh=st.number_input("Nuevo alto",value=v["alto"],key=f"emh{i}")
+
+            if st.button("Guardar",key=f"savem{i}"):
+                st.session_state.cot_m2[i]["ancho"]=na
+                st.session_state.cot_m2[i]["alto"]=nh
+                st.session_state[f"edit_m_{i}"]=False
+                st.rerun()
 
         total_general+=v["total"]
 
     if total_general>0:
         st.success(f"TOTAL: {r(total_general)} Bs")
+
+    if st.button("Guardar en BD"):
+        c.execute("INSERT INTO cot_m2(cliente,total,fecha) VALUES (?,?,?)",
+                  (cliente,total_general,datetime.now().strftime("%d/%m/%Y")))
+        conn.commit()
+        st.success("Guardado en historial")
+
+# ================= HISTORIAL =================
+elif modo=="Historial":
+
+    st.header("Historial")
+
+    st.subheader("Proyectos")
+    for row in c.execute("SELECT id,nombre FROM proyectos"):
+        if st.button(f"Cargar {row[1]}"):
+            data=c.execute("SELECT data FROM proyectos WHERE id=?",(row[0],)).fetchone()[0]
+            st.session_state.pedido=json.loads(data)
+            st.success("Proyecto cargado")
+
+    st.subheader("Cotizaciones m²")
+    for row in c.execute("SELECT cliente,total,fecha FROM cot_m2"):
+        st.write(f"{row[0]} | {row[1]} Bs | {row[2]}")
