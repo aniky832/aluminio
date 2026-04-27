@@ -23,47 +23,6 @@ def optimizar_barras(piezas, largo=600):
             barras.append([p])
     return barras
 
-def generar_pdf(pedido):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "PRODUCCION LINEA 25", ln=True, align="C")
-    pdf.ln(10)
-
-    for v in pedido:
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(190, 10, f"{v['medida']} ({v['div']} hojas)", ln=True)
-
-        pdf.set_font("Helvetica", "", 10)
-        vid = v["vidrio"]
-        pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {r(vid['alto'])} x {r(vid['ancho'])}", ln=True)
-
-        for n, info in v['detalles'].items():
-            pdf.cell(190, 7, f"{info['cant']} {n}: {r(info['medida'])}", ln=True)
-
-        pdf.ln(5)
-
-    return pdf.output(dest='S').encode('latin1')
-
-def generar_pdf_optimizacion(todos):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "OPTIMIZACION", ln=True, align="C")
-    pdf.ln(10)
-
-    for p, piezas in todos.items():
-        if p != "VIDRIO" and piezas:
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(190, 8, p, ln=True)
-
-            for i, b in enumerate(optimizar_barras(piezas), 1):
-                pdf.cell(190, 6, f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))}", ln=True)
-
-            pdf.ln(3)
-
-    return pdf.output(dest='S').encode('latin1')
-
 def calcular_materiales(todos):
     resumen = {}
     for p, piezas in todos.items():
@@ -94,7 +53,7 @@ PRECIOS_VIDRIO = {
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
-# ---------- SESSION ----------
+# SESSION
 if "pedido" not in st.session_state:
     st.session_state.pedido = []
 
@@ -114,12 +73,12 @@ with st.sidebar:
     file = st.file_uploader("Abrir Proyecto", type="json")
     if file:
         st.session_state.pedido = json.load(file)
+        st.success("Proyecto cargado")
 
     if st.button("Nuevo Proyecto"):
         st.session_state.pedido = []
         st.rerun()
 
-    st.divider()
     modo = st.radio("Modo", ["Producción línea 25", "Cotización", "Cotización m²"])
 
 # ================= PRODUCCIÓN =================
@@ -127,54 +86,74 @@ if modo == "Producción línea 25":
 
     st.header("Producción línea 25")
 
-    with st.form("form_prod"):
-        anc = st.number_input("Ancho", 0.0, key="prod_ancho")
-        alt = st.number_input("Alto", 0.0, key="prod_alto")
-        hojas = st.selectbox("Hojas", [2,3,4], key="prod_hojas")
+    anc = st.number_input("Ancho", 0.0, key="prod_a")
+    alt = st.number_input("Alto", 0.0, key="prod_h")
+    hojas = st.selectbox("Hojas", [2,3,4], key="prod_hojas")
 
-        ok = st.form_submit_button("Agregar")
+    if st.button("Agregar"):
+        if hojas == 2:
+            z, cz, cp = (anc - 16)/2, 4, 2
+        elif hojas == 3:
+            z, cz, cp = (anc - 26.5)/3, 6, 4
+        else:
+            z, cz, cp = (anc - 30)/4, 8, 6
 
-        if ok and anc > 0 and alt > 0:
-            riel = anc - 1.5
-
-            if hojas == 2:
-                z, cz, cp = (anc - 16)/2, 4, 2
-            elif hojas == 3:
-                z, cz, cp = (anc - 26.5)/3, 6, 4
-            else:
-                z, cz, cp = (anc - 30)/4, 8, 6
-
-            st.session_state.pedido.append({
-                "medida": f"{anc}x{alt}",
-                "div": hojas,
-                "detalles": {
-                    "JAMBA": {"medida": alt, "cant": 2},
-                    "RIEL SUPERIOR": {"medida": riel, "cant": 1},
-                    "RIEL INFERIOR": {"medida": riel, "cant": 1},
-                    "PIERNA": {"medida": alt-3.5, "cant": cp},
-                    "GANCHO": {"medida": alt-3.5, "cant": 2},
-                    "ZOCALO": {"medida": z, "cant": cz}
-                },
-                "vidrio": {"ancho": z+1.5, "alto": alt-15, "cant": hojas}
-            })
+        st.session_state.pedido.append({
+            "medida": f"{anc}x{alt}",
+            "div": hojas,
+            "detalles": {
+                "JAMBA": {"medida": alt, "cant": 2},
+                "RIEL SUPERIOR": {"medida": anc-1.5, "cant": 1},
+                "RIEL INFERIOR": {"medida": anc-1.5, "cant": 1},
+                "PIERNA": {"medida": alt-3.5, "cant": cp},
+                "GANCHO": {"medida": alt-3.5, "cant": 2},
+                "ZOCALO": {"medida": z, "cant": cz}
+            },
+            "vidrio": {"ancho": z+1.5, "alto": alt-15, "cant": hojas}
+        })
 
     if st.session_state.pedido:
-        st.write("Ventanas cargadas:", len(st.session_state.pedido))
+        st.subheader("Ventanas")
+        for v in st.session_state.pedido:
+            st.write(v["medida"])
 
 # ================= COTIZACIÓN =================
 elif modo == "Cotización":
 
-    st.header("Cotización")
+    st.header("Cotización completa")
 
-    precio = st.number_input("Precio base", 0.0, key="cot_precio")
+    color_al = st.selectbox("Color aluminio", list(PRECIOS_ALUMINIO.keys()))
+    color_vid = st.selectbox("Color vidrio", list(PRECIOS_VIDRIO.keys()))
+    ganancia = st.number_input("Ganancia %", 0.0, 100.0, 30.0)
 
-    anc = st.number_input("Ancho", 0.0, key="cot_ancho")
-    alt = st.number_input("Alto", 0.0, key="cot_alto")
+    anc = st.number_input("Ancho", 0.0, key="cot_a")
+    alt = st.number_input("Alto", 0.0, key="cot_h")
+    hojas = st.selectbox("Hojas", [2,3,4], key="cot_hojas")
 
-    if st.button("Calcular Cotización"):
-        if anc > 0 and alt > 0:
-            total = (anc * alt / 10000) * precio
-            st.success(f"Total: {r(total)} Bs")
+    if st.button("Cotizar"):
+        if hojas == 2:
+            z, cz, cp = (anc - 16)/2, 4, 2
+        elif hojas == 3:
+            z, cz, cp = (anc - 26.5)/3, 6, 4
+        else:
+            z, cz, cp = (anc - 30)/4, 8, 6
+
+        todos = {"JAMBA":[alt]*2,"RIEL SUPERIOR":[anc-1.5],"RIEL INFERIOR":[anc-1.5],
+                 "PIERNA":[alt-3.5]*cp,"GANCHO":[alt-3.5]*2,"ZOCALO":[z]*cz,
+                 "VIDRIO":[{"ancho":z+1.5,"alto":alt-15,"cant":hojas}]}
+
+        mat = calcular_materiales(todos)
+
+        total = 0
+
+        for p,b in mat.items():
+            if p!="VIDRIO":
+                total += b * PRECIOS_ALUMINIO[color_al][p]
+
+        total += mat["VIDRIO"] * PRECIOS_VIDRIO[color_vid]
+        total_final = total + (total * ganancia/100)
+
+        st.success(f"Total: {r(total_final)} Bs")
 
 # ================= COTIZACIÓN m² =================
 elif modo == "Cotización m²":
@@ -183,10 +162,10 @@ elif modo == "Cotización m²":
 
     precio = st.number_input("Precio m²", 100.0, 1000.0, 300.0, key="m2_precio")
 
-    anc = st.number_input("Ancho", 0.0, key="m2_ancho")
-    alt = st.number_input("Alto", 0.0, key="m2_alto")
+    anc = st.number_input("Ancho", 0.0, key="m2_a")
+    alt = st.number_input("Alto", 0.0, key="m2_h")
 
-    if st.button("Agregar m²"):
+    if st.button("Agregar m2"):
         if anc > 0 and alt > 0:
             area = (anc * alt) / 10000
             total = area * precio
@@ -194,7 +173,7 @@ elif modo == "Cotización m²":
 
     total_general = 0
 
-    for i, (a, h, t) in enumerate(st.session_state.cot_m2):
+    for a,h,t in st.session_state.cot_m2:
         st.write(f"{r(a)} x {r(h)} = {r(t)} Bs")
         total_general += t
 
