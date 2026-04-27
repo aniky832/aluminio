@@ -161,7 +161,6 @@ if modo == "Producción línea 25":
                 },
                 "vidrio": {"ancho": z+1.5, "alto": alt-15, "cant": hojas}
             })
-
    if st.session_state.pedido:
 
     todos = {"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
