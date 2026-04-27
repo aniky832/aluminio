@@ -27,7 +27,7 @@ def generar_pdf(pedido):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "HOJA DE TRABAJO - LINEA 25", ln=True, align="C")
+    pdf.cell(190, 10, "PRODUCCION LINEA 25", ln=True, align="C")
     pdf.ln(10)
 
     for v in pedido:
@@ -49,7 +49,7 @@ def generar_pdf_optimizacion(todos):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "OPTIMIZACION DE MATERIALES", ln=True, align="C")
+    pdf.cell(190, 10, "OPTIMIZACION LINEA 25", ln=True, align="C")
     pdf.ln(10)
 
     for p, piezas in todos.items():
@@ -123,10 +123,12 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    modo = st.radio("Modo", ["Producción", "💰 Cotización"])
+    modo = st.radio("Modo", ["Producción línea 25", "Cotización"])
 
 # ---------- PRODUCCIÓN ----------
-if modo == "Producción":
+if modo == "Producción línea 25":
+
+    st.header("Producción línea 25")
 
     with st.form("form"):
         c1, c2, c3 = st.columns(3)
@@ -190,7 +192,7 @@ if modo == "Producción":
 # ---------- COTIZACIÓN ----------
 elif modo == "Cotización":
 
-    st.title("Cotización")
+    st.header("Cotización")
 
     cliente = st.text_input("Cliente")
     fecha = datetime.now().strftime("%d/%m/%Y")
