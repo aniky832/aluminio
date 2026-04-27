@@ -361,3 +361,67 @@ elif modo == "Cotización":
                 file_name="cotizacion.pdf",
                 mime="application/pdf"
             )
+            elif modo == "Cotización m²":
+
+    st.header("📐 Cotización por Metro Cuadrado")
+
+    # MEMORIA
+    if "cot_m2" not in st.session_state:
+        st.session_state.cot_m2 = []
+
+    # 1️⃣ PRIMERO PRECIO
+    precio_m2 = st.number_input(
+        "💰 Precio por m² (Bs)",
+        min_value=100.0,
+        max_value=1000.0,
+        value=300.0
+    )
+
+    st.divider()
+
+    # 2️⃣ LUEGO MEDIDAS
+    c1, c2 = st.columns(2)
+    ancho = c1.number_input("Ancho (cm)", 0.0, key="m2_ancho")
+    alto = c2.number_input("Alto (cm)", 0.0, key="m2_alto")
+
+    # 3️⃣ AGREGAR
+    if st.button("➕ Agregar"):
+        if ancho > 0 and alto > 0:
+
+            area = (ancho * alto) / 10000
+            total = area * precio_m2
+
+            st.session_state.cot_m2.append({
+                "ancho": ancho,
+                "alto": alto,
+                "area": area,
+                "precio": precio_m2,
+                "total": total
+            })
+
+    # 4️⃣ MOSTRAR LISTA
+    if st.session_state.cot_m2:
+
+        st.subheader("📋 Cotizaciones guardadas")
+
+        total_general = 0
+
+        for i, c in enumerate(st.session_state.cot_m2):
+
+            with st.expander(f"Cotización {i+1}"):
+
+                st.write(f"Medida: {r(c['ancho'])} x {r(c['alto'])} cm")
+                st.write(f"Área: {r(c['area'])} m²")
+                st.write(f"Precio m²: {r(c['precio'])} Bs")
+                st.write(f"Total: {r(c['total'])} Bs")
+
+                total_general += c["total"]
+
+                if st.button("❌ Eliminar", key=f"del_m2_{i}"):
+                    st.session_state.cot_m2.pop(i)
+                    st.rerun()
+
+        st.divider()
+
+        st.subheader("💰 TOTAL GENERAL")
+        st.success(f"{r(total_general)} Bs")
