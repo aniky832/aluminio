@@ -4,10 +4,10 @@ from fpdf import FPDF
 import math
 from datetime import datetime
 
-# ---------------- UTIL ----------------
+# -------- UTIL --------
 def r(x): return round(x,1)
 
-# ---------------- OPTIMIZACIÓN ----------------
+# -------- OPTIMIZAR --------
 def optimizar_barras(piezas, largo=600):
     piezas = sorted(piezas, reverse=True)
     barras=[]
@@ -22,7 +22,7 @@ def optimizar_barras(piezas, largo=600):
             barras.append([p])
     return barras
 
-# ---------------- PDF ----------------
+# -------- PDF --------
 def pdf_ventanas(pedido):
     pdf=FPDF(); pdf.add_page()
     pdf.set_font("Helvetica","B",16)
@@ -55,7 +55,7 @@ def pdf_optimizacion(todos):
 
     return pdf.output(dest="S").encode("latin1")
 
-# ---------------- MATERIALES ----------------
+# -------- MATERIALES --------
 def calcular_materiales(todos):
     resumen={}
     for p,piezas in todos.items():
@@ -66,7 +66,7 @@ def calcular_materiales(todos):
     resumen["VIDRIO"]=math.ceil(total_area/(330*214))
     return resumen
 
-# ---------------- PRECIOS ----------------
+# -------- PRECIOS --------
 PRECIOS_AL = {
 "MT":{"RIEL SUPERIOR":187,"RIEL INFERIOR":187,"ZOCALO":177,"GANCHO":171,"JAMBA":159,"PIERNA":171},
 "CH":{"RIEL SUPERIOR":191,"RIEL INFERIOR":191,"ZOCALO":180,"GANCHO":171,"JAMBA":160,"PIERNA":171},
@@ -77,17 +77,19 @@ PRECIOS_AL = {
 
 PRECIOS_VID={"Bronce":500,"Incoloro":490,"Gris":780,"Estipoly Incoloro":320}
 
-# ---------------- APP ----------------
+# -------- APP --------
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
-# estado
+# estados
 if "pedido" not in st.session_state:
     st.session_state.pedido=[]
+if "cot_lista" not in st.session_state:
+    st.session_state.cot_lista=[]
 if "cot_m2" not in st.session_state:
     st.session_state.cot_m2=[]
 
-# ---------------- SIDEBAR ----------------
+# -------- SIDEBAR --------
 with st.sidebar:
     st.header("Proyecto")
 
@@ -100,6 +102,8 @@ with st.sidebar:
 
     if st.button("Nuevo"):
         st.session_state.pedido=[]
+        st.session_state.cot_lista=[]
+        st.session_state.cot_m2=[]
         st.rerun()
 
     modo=st.radio("Modo",["Producción","Cotización","Cotización m²"])
@@ -137,7 +141,8 @@ if modo=="Producción":
         todos={"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
 
         for i,v in enumerate(st.session_state.pedido):
-            with st.expander(v["medida"]):
+            with st.expander(f"Ventana {i+1} - {v['medida']}"):
+
                 for n,info in v["detalles"].items():
                     st.write(f"{info['cant']} {n}: {r(info['medida'])}")
                     todos[n]+= [info["medida"]]*info["cant"]
@@ -146,7 +151,7 @@ if modo=="Producción":
                 st.write(f"{vid['cant']} vidrio: {r(vid['alto'])} x {r(vid['ancho'])}")
                 todos["VIDRIO"].append(vid)
 
-                if st.button("Eliminar",key=f"del{i}"):
+                if st.button("❌ Eliminar",key=f"prod_{i}"):
                     st.session_state.pedido.pop(i)
                     st.rerun()
 
@@ -164,7 +169,6 @@ elif modo=="Cotización":
 
     st.header("Cotización")
 
-    cliente=st.text_input("Cliente")
     color_al=st.selectbox("Color aluminio",list(PRECIOS_AL.keys()))
     color_vid=st.selectbox("Color vidrio",list(PRECIOS_VID.keys()))
     ganancia=st.number_input("Ganancia %",0.0,100.0,30.0)
@@ -173,7 +177,23 @@ elif modo=="Cotización":
     alt=st.number_input("Alto",0.0,key="c_h")
     hojas=st.selectbox("Hojas",[2,3,4],key="c_hj")
 
-    if st.button("Calcular"):
+    if st.button("➕ Agregar"):
+        st.session_state.cot_lista.append({
+            "ancho":anc,"alto":alt,"hojas":hojas
+        })
+
+    total_final=0
+
+    for i,v in enumerate(st.session_state.cot_lista):
+
+        st.write(f"{i+1}) {r(v['ancho'])} x {r(v['alto'])} | {v['hojas']} hojas")
+
+        if st.button("❌ Eliminar",key=f"cot_{i}"):
+            st.session_state.cot_lista.pop(i)
+            st.rerun()
+
+        anc=v["ancho"]; alt=v["alto"]; hojas=v["hojas"]
+
         if hojas==2: z,cz,cp=(anc-16)/2,4,2
         elif hojas==3: z,cz,cp=(anc-26.5)/3,6,4
         else: z,cz,cp=(anc-30)/4,8,6
@@ -184,21 +204,17 @@ elif modo=="Cotización":
 
         mat=calcular_materiales(todos)
 
-        total=0
-        detalle=[]
-
+        subtotal=0
         for p,b in mat.items():
             if p!="VIDRIO":
-                sub=b*PRECIOS_AL[color_al][p]
-                total+=sub
-                detalle.append(f"{p}: {b} x {PRECIOS_AL[color_al][p]} = {sub}")
+                subtotal+=b*PRECIOS_AL[color_al][p]
 
-        vid_total=mat["VIDRIO"]*PRECIOS_VID[color_vid]
-        total+=vid_total
-        detalle.append(f"VIDRIO: {mat['VIDRIO']} x {PRECIOS_VID[color_vid]} = {vid_total}")
+        subtotal+=mat["VIDRIO"]*PRECIOS_VID[color_vid]
+        total_final+=subtotal
 
-        total_final=total+(total*ganancia/100)
+    total_final=total_final+(total_final*ganancia/100)
 
+    if total_final>0:
         st.success(f"TOTAL: {r(total_final)} Bs")
 
 # ================= COTIZACIÓN m² =================
@@ -206,7 +222,6 @@ elif modo=="Cotización m²":
 
     st.header("Cotización m²")
 
-    cliente=st.text_input("Cliente")
     precio=st.number_input("Precio m²",100.0,1000.0,300.0)
 
     anc=st.number_input("Ancho",0.0,key="m2_a")
@@ -214,71 +229,23 @@ elif modo=="Cotización m²":
     hojas=st.selectbox("Hojas",[2,3,4])
 
     if st.button("Agregar m2"):
-        if anc>0 and alt>0:
-            area=(anc*alt)/10000
-            total=area*precio
-            st.session_state.cot_m2.append({
-                "ancho":anc,"alto":alt,"hojas":hojas,"total":total
-            })
+        area=(anc*alt)/10000
+        total=area*precio
+        st.session_state.cot_m2.append({
+            "ancho":anc,"alto":alt,"hojas":hojas,"total":total
+        })
 
     total_general=0
 
     for i,v in enumerate(st.session_state.cot_m2):
+
         st.write(f"{i+1}) {r(v['ancho'])} x {r(v['alto'])} | {v['hojas']} hojas → {r(v['total'])}")
+
+        if st.button("❌ Eliminar",key=f"m2_{i}"):
+            st.session_state.cot_m2.pop(i)
+            st.rerun()
+
         total_general+=v["total"]
 
     if total_general>0:
         st.success(f"TOTAL: {r(total_general)} Bs")
-
-    if st.button("PDF m2"):
-
-        pdf=FPDF(); pdf.add_page()
-
-        pdf.set_font("Helvetica","B",16)
-        pdf.cell(190,10,"COTIZACION m2",ln=True,align="C")
-
-        pdf.set_font("Helvetica","",11)
-        pdf.cell(190,8,f"Cliente: {cliente}",ln=True)
-        pdf.cell(190,8,f"Fecha: {datetime.now().strftime('%d/%m/%Y')}",ln=True)
-
-        y_base=pdf.get_y()+5
-        col=0
-
-        for i,v in enumerate(st.session_state.cot_m2):
-
-            x=15+(col*95)
-            y=y_base
-
-            pdf.set_xy(x,y)
-            pdf.cell(80,5,f"V{i+1}: {r(v['ancho'])}x{r(v['alto'])}",ln=False)
-
-            y+=6
-            w=60; h=35
-
-            pdf.rect(x,y,w,h)
-
-            for j in range(1,v["hojas"]):
-                pdf.line(x+(w/v["hojas"])*j,y,x+(w/v["hojas"])*j,y+h)
-
-            # flechas
-            pdf.line(x,y+h+2,x+w,y+h+2)
-            pdf.line(x,y+h+2,x+3,y+h-1)
-            pdf.line(x+w,y+h+2,x+w-3,y+h-1)
-
-            pdf.text(x+w/2-10,y+h+6,f"{r(v['ancho'])}")
-
-            pdf.line(x-3,y,x-3,y+h)
-            pdf.line(x-3,y,x,y+3)
-            pdf.line(x-3,y+h,x,y+h-3)
-
-            pdf.text(x-15,y+h/2,f"{r(v['alto'])}")
-
-            col+=1
-            if col==2:
-                col=0
-                y_base+=55
-
-        pdf.set_y(y_base+5)
-        pdf.cell(190,10,f"TOTAL: {r(total_general)} Bs",ln=True)
-
-        st.download_button("Descargar PDF",pdf.output(dest="S").encode("latin1"),"cot_m2.pdf")
