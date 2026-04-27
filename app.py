@@ -66,14 +66,12 @@ def generar_pdf_optimizacion(todos):
 
 def calcular_materiales(todos):
     resumen = {}
-
     for p, piezas in todos.items():
         if p != "VIDRIO" and piezas:
             resumen[p] = len(optimizar_barras(piezas))
 
     total_area = sum(v["ancho"] * v["alto"] * v["cant"] for v in todos["VIDRIO"])
     resumen["VIDRIO"] = math.ceil(total_area / (330 * 214))
-
     return resumen
 
 # ---------- PRECIOS ----------
@@ -96,7 +94,7 @@ PRECIOS_VIDRIO = {
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
-# ---------- ESTADOS ----------
+# ---------- SESSION ----------
 if "pedido" not in st.session_state:
     st.session_state.pedido = []
 
@@ -108,20 +106,14 @@ if "cot_m2" not in st.session_state:
 
 # ---------- SIDEBAR ----------
 with st.sidebar:
-
     st.header("📂 Proyecto")
 
     if st.session_state.pedido:
-        st.download_button(
-            "Guardar Proyecto",
-            json.dumps(st.session_state.pedido),
-            "proyecto.json"
-        )
+        st.download_button("Guardar Proyecto", json.dumps(st.session_state.pedido), "proyecto.json")
 
     file = st.file_uploader("Abrir Proyecto", type="json")
     if file:
         st.session_state.pedido = json.load(file)
-        st.success("Proyecto cargado")
 
     if st.button("Nuevo Proyecto"):
         st.session_state.pedido = []
@@ -135,11 +127,11 @@ if modo == "Producción línea 25":
 
     st.header("Producción línea 25")
 
-    with st.form("form"):
-        c1, c2, c3 = st.columns(3)
-        anc = c1.number_input("Ancho", 0.0)
-        alt = c2.number_input("Alto", 0.0)
-        hojas = c3.selectbox("Hojas", [2,3,4])
+    with st.form("form_prod"):
+        anc = st.number_input("Ancho", 0.0, key="prod_ancho")
+        alt = st.number_input("Alto", 0.0, key="prod_alto")
+        hojas = st.selectbox("Hojas", [2,3,4], key="prod_hojas")
+
         ok = st.form_submit_button("Agregar")
 
         if ok and anc > 0 and alt > 0:
@@ -167,53 +159,44 @@ if modo == "Producción línea 25":
             })
 
     if st.session_state.pedido:
+        st.write("Ventanas cargadas:", len(st.session_state.pedido))
 
-        todos = {"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
+# ================= COTIZACIÓN =================
+elif modo == "Cotización":
 
-        st.subheader("Ventanas")
+    st.header("Cotización")
 
-        for i, v in enumerate(st.session_state.pedido):
-            with st.expander(f"{v['medida']}"):
-                for n, info in v["detalles"].items():
-                    st.write(f"{info['cant']} {n}: {r(info['medida'])}")
-                    todos[n] += [info["medida"]] * info["cant"]
+    precio = st.number_input("Precio base", 0.0, key="cot_precio")
 
-                vid = v["vidrio"]
-                st.write(f"{vid['cant']} vidrio: {r(vid['alto'])} x {r(vid['ancho'])}")
-                todos["VIDRIO"].append(vid)
+    anc = st.number_input("Ancho", 0.0, key="cot_ancho")
+    alt = st.number_input("Alto", 0.0, key="cot_alto")
 
-        if st.button("Optimizar"):
-            for p, piezas in todos.items():
-                if p != "VIDRIO" and piezas:
-                    st.write(p)
-                    for i, b in enumerate(optimizar_barras(piezas),1):
-                        st.write(f"Tira {i}: {[r(x) for x in b]} | sobra {r(600-sum(b))}")
-
-        st.download_button("PDF Ventanas", generar_pdf(st.session_state.pedido), "ventanas.pdf")
-        st.download_button("PDF Optimización", generar_pdf_optimizacion(todos), "optimizacion.pdf")
+    if st.button("Calcular Cotización"):
+        if anc > 0 and alt > 0:
+            total = (anc * alt / 10000) * precio
+            st.success(f"Total: {r(total)} Bs")
 
 # ================= COTIZACIÓN m² =================
 elif modo == "Cotización m²":
 
     st.header("Cotización m²")
 
-    precio = st.number_input("Precio por m²", 100.0, 1000.0, 300.0)
+    precio = st.number_input("Precio m²", 100.0, 1000.0, 300.0, key="m2_precio")
 
-    c1,c2 = st.columns(2)
-    anc = c1.number_input("Ancho",0.0)
-    alt = c2.number_input("Alto",0.0)
+    anc = st.number_input("Ancho", 0.0, key="m2_ancho")
+    alt = st.number_input("Alto", 0.0, key="m2_alto")
 
-    if st.button("Agregar"):
-        if anc>0 and alt>0:
-            area = (anc*alt)/10000
-            total = area*precio
-            st.session_state.cot_m2.append((anc,alt,total))
+    if st.button("Agregar m²"):
+        if anc > 0 and alt > 0:
+            area = (anc * alt) / 10000
+            total = area * precio
+            st.session_state.cot_m2.append((anc, alt, total))
 
     total_general = 0
 
-    for i,(a,h,t) in enumerate(st.session_state.cot_m2):
+    for i, (a, h, t) in enumerate(st.session_state.cot_m2):
         st.write(f"{r(a)} x {r(h)} = {r(t)} Bs")
         total_general += t
 
-    if total_general>0:
+    if total_general > 0:
         st.success(f"TOTAL: {r(total_general)} Bs")
