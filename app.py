@@ -27,7 +27,7 @@ def generar_pdf(pedido):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "PRODUCCION LINEA 25", ln=True, align="C")
+    pdf.cell(190, 10, "PRODUCCION", ln=True, align="C")
     pdf.ln(10)
 
     for v in pedido:
@@ -101,7 +101,7 @@ PRECIOS_VIDRIO = {
 
 # ---------- APP ----------
 st.set_page_config(layout="wide")
-st.title("🛠️ Sistema Linea 25 PRO")
+st.title("Sistema Linea 25")
 
 if "pedido" not in st.session_state:
     st.session_state.pedido = []
