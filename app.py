@@ -89,6 +89,76 @@ def pdf_optimizacion(todos):
 # ---------------- PDF COTIZACION ----------------
 def pdf_cotizacion_m2(pedido, cliente, precio_m2):
     from datetime import datetime
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    def r(x): return round(x,1)
+
+    # ---- ENCABEZADO ----
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(190, 10, "COTIZACION", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(190, 6, f"Cliente: {cliente}", ln=True)
+    pdf.cell(190, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
+
+    pdf.ln(5)
+
+    # ---- DIBUJOS ----
+    y_base = pdf.get_y()
+    col = 0
+    total_general = 0
+
+    for i, v in enumerate(pedido):
+
+        anc = float(v["medida"].split("x")[0])
+        alt = float(v["medida"].split("x")[1])
+        hojas = v["div"]
+
+        area = (anc * alt) / 10000
+        total = area * precio_m2
+        total_general += total
+
+        # posición
+        x = 15 + (col * 95)
+        y = y_base
+
+        # título ventana
+        pdf.set_xy(x, y)
+        pdf.cell(80, 5, f"V{i+1}", ln=False)
+
+        y += 6
+        w, h = 60, 35
+
+        # marco
+        pdf.rect(x, y, w, h)
+
+        # divisiones
+        for j in range(1, hojas):
+            pdf.line(x + (w/hojas)*j, y, x + (w/hojas)*j, y + h)
+
+        # ancho (abajo)
+        pdf.line(x, y+h+2, x+w, y+h+2)
+        pdf.text(x + w/2 - 10, y+h+6, f"{r(anc)}")
+
+        # alto (lado)
+        pdf.line(x-3, y, x-3, y+h)
+        pdf.text(x-15, y + h/2, f"{r(alt)}")
+
+        col += 1
+        if col == 2:
+            col = 0
+            y_base += 55
+
+    # ---- TOTAL ----
+    pdf.set_y(y_base + 5)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(190, 10, f"TOTAL: {r(total_general)} Bs", ln=True)
+
+    return pdf.output(dest='S').encode('latin1')
+    from datetime import datetime
 
     pdf = FPDF()
     pdf.add_page()
