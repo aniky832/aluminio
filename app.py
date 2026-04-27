@@ -106,6 +106,74 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
 
     pdf.ln(5)
 
+    def pdf_ventanas_con_cortes(pedido):
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    def r(x): return round(x,1)
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(190, 10, "PRODUCCION - VENTANAS", ln=True, align="C")
+    pdf.ln(5)
+
+    y_base = pdf.get_y()
+    col = 0
+
+    for i, v in enumerate(pedido):
+
+        anc = float(v["medida"].split("x")[0])
+        alt = float(v["medida"].split("x")[1])
+        hojas = v["div"]
+
+        x = 15 + (col * 95)
+        y = y_base
+
+        # número ventana
+        pdf.set_xy(x, y)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(80, 5, f"V{i+1}", ln=False)
+
+        y += 6
+        w, h = 60, 30
+
+        # marco
+        pdf.rect(x, y, w, h)
+
+        # divisiones
+        for j in range(1, hojas):
+            pdf.line(x + (w/hojas)*j, y, x + (w/hojas)*j, y + h)
+
+        # medidas
+        pdf.set_font("Helvetica", "", 8)
+
+        pdf.line(x, y+h+2, x+w, y+h+2)
+        pdf.text(x + w/2 - 10, y+h+6, f"{r(anc)}")
+
+        pdf.line(x-3, y, x-3, y+h)
+        pdf.text(x-15, y + h/2, f"{r(alt)}")
+
+        # ---- DESCUENTOS ----
+        y_texto = y + h + 10
+
+        pdf.set_xy(x, y_texto)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(80, 4, "CORTES:", ln=True)
+
+        pdf.set_font("Helvetica", "", 7)
+
+        for n, info in v["detalles"].items():
+            pdf.set_x(x)
+            pdf.cell(80, 4, f"{info['cant']} {n}: {r(info['medida'])}", ln=True)
+
+        col += 1
+
+        if col == 2:
+            col = 0
+            y_base = y_texto + 30
+
+    return pdf.output(dest='S').encode('latin1')
     # ---- DIBUJOS ----
     y_base = pdf.get_y()
     col = 0
@@ -340,3 +408,11 @@ if st.session_state.pedido:
             "cotizacion_m2.pdf",
             "application/pdf"
         )
+pdf_detalle = pdf_ventanas_con_cortes(st.session_state.pedido)
+
+st.download_button(
+    "📄 PDF Producción (Ventanas + Cortes)",
+    pdf_detalle,
+    "produccion_visual.pdf",
+    "application/pdf"
+)
