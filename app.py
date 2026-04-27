@@ -162,15 +162,27 @@ if modo == "Producción línea 25":
                 "vidrio": {"ancho": z+1.5, "alto": alt-15, "cant": hojas}
             })
 
-    if st.session_state.pedido:
+   if st.session_state.pedido:
 
-        todos = {"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
+    todos = {"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
 
-        for v in st.session_state.pedido:
+    st.subheader("📋 Ventanas agregadas")
+
+    for i, v in enumerate(st.session_state.pedido):
+
+        with st.expander(f"Ventana {i+1} - {v['medida']} ({v['div']} hojas)"):
+
             for n, info in v["detalles"].items():
+                st.write(f"{info['cant']} {n}: {r(info['medida'])} cm")
                 todos[n] += [info["medida"]] * info["cant"]
-            todos["VIDRIO"].append(v["vidrio"])
 
+            vid = v["vidrio"]
+            st.write(f"{vid['cant']} VIDRIO: {r(vid['alto'])} x {r(vid['ancho'])} cm")
+            todos["VIDRIO"].append(vid)
+
+            if st.button("❌ Eliminar", key=f"del_{i}"):
+                st.session_state.pedido.pop(i)
+                st.rerun()
         if st.button("Calcular Optimización"):
             for p, piezas in todos.items():
                 if p != "VIDRIO" and piezas:
