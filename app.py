@@ -188,9 +188,9 @@ if modo == "Producción":
         st.write(f"VIDRIO: {resumen['VIDRIO']} planchas")
 
 # ---------- COTIZACIÓN ----------
-elif modo == "💰 Cotización":
+elif modo == "Cotización":
 
-    st.title("💰 Cotización Profesional")
+    st.title("Cotización")
 
     cliente = st.text_input("Cliente")
     fecha = datetime.now().strftime("%d/%m/%Y")
