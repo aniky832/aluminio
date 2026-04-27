@@ -32,14 +32,14 @@ def generar_pdf(pedido):
 
     for v in pedido:
         pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(190, 10, f"VENTANA - {v['medida']} ({v['div']} hojas)", ln=True)
+        pdf.cell(190, 10, f"{v['medida']} ({v['div']} hojas)", ln=True)
 
         pdf.set_font("Helvetica", "", 10)
         vid = v["vidrio"]
         pdf.cell(190, 7, f"Vidrios: {vid['cant']} de {r(vid['alto'])} x {r(vid['ancho'])}", ln=True)
 
         for n, info in v['detalles'].items():
-            pdf.cell(190, 7, f"- {info['cant']} {n}: {r(info['medida'])} cm", ln=True)
+            pdf.cell(190, 7, f"{info['cant']} {n}: {r(info['medida'])}", ln=True)
 
         pdf.ln(5)
 
@@ -49,7 +49,7 @@ def generar_pdf_optimizacion(todos):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "OPTIMIZACION LINEA 25", ln=True, align="C")
+    pdf.cell(190, 10, "OPTIMIZACION", ln=True, align="C")
     pdf.ln(10)
 
     for p, piezas in todos.items():
@@ -57,13 +57,10 @@ def generar_pdf_optimizacion(todos):
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(190, 8, p, ln=True)
 
-            barras = optimizar_barras(piezas)
-            pdf.set_font("Helvetica", "", 10)
+            for i, b in enumerate(optimizar_barras(piezas), 1):
+                pdf.cell(190, 6, f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))}", ln=True)
 
-            for i, b in enumerate(barras, 1):
-                pdf.cell(190, 6, f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))} cm", ln=True)
-
-            pdf.ln(4)
+            pdf.ln(3)
 
     return pdf.output(dest='S').encode('latin1')
 
@@ -99,6 +96,7 @@ PRECIOS_VIDRIO = {
 st.set_page_config(layout="wide")
 st.title("🛠️ Sistema Linea 25 PRO")
 
+# ---------- ESTADOS ----------
 if "pedido" not in st.session_state:
     st.session_state.pedido = []
 
@@ -110,6 +108,26 @@ if "cot_m2" not in st.session_state:
 
 # ---------- SIDEBAR ----------
 with st.sidebar:
+
+    st.header("📂 Proyecto")
+
+    if st.session_state.pedido:
+        st.download_button(
+            "Guardar Proyecto",
+            json.dumps(st.session_state.pedido),
+            "proyecto.json"
+        )
+
+    file = st.file_uploader("Abrir Proyecto", type="json")
+    if file:
+        st.session_state.pedido = json.load(file)
+        st.success("Proyecto cargado")
+
+    if st.button("Nuevo Proyecto"):
+        st.session_state.pedido = []
+        st.rerun()
+
+    st.divider()
     modo = st.radio("Modo", ["Producción línea 25", "Cotización", "Cotización m²"])
 
 # ================= PRODUCCIÓN =================
@@ -122,7 +140,6 @@ if modo == "Producción línea 25":
         anc = c1.number_input("Ancho", 0.0)
         alt = c2.number_input("Alto", 0.0)
         hojas = c3.selectbox("Hojas", [2,3,4])
-
         ok = st.form_submit_button("Agregar")
 
         if ok and anc > 0 and alt > 0:
@@ -153,54 +170,50 @@ if modo == "Producción línea 25":
 
         todos = {"JAMBA":[],"RIEL SUPERIOR":[],"RIEL INFERIOR":[],"PIERNA":[],"GANCHO":[],"ZOCALO":[],"VIDRIO":[]}
 
-        st.subheader("📋 Ventanas agregadas")
+        st.subheader("Ventanas")
 
         for i, v in enumerate(st.session_state.pedido):
-            with st.expander(f"Ventana {i+1} - {v['medida']}"):
+            with st.expander(f"{v['medida']}"):
                 for n, info in v["detalles"].items():
-                    st.write(f"{info['cant']} {n}: {r(info['medida'])} cm")
+                    st.write(f"{info['cant']} {n}: {r(info['medida'])}")
                     todos[n] += [info["medida"]] * info["cant"]
 
                 vid = v["vidrio"]
-                st.write(f"{vid['cant']} VIDRIO: {r(vid['alto'])} x {r(vid['ancho'])}")
+                st.write(f"{vid['cant']} vidrio: {r(vid['alto'])} x {r(vid['ancho'])}")
                 todos["VIDRIO"].append(vid)
 
-        if st.button("Calcular Optimización"):
+        if st.button("Optimizar"):
             for p, piezas in todos.items():
                 if p != "VIDRIO" and piezas:
                     st.write(p)
-                    for i,b in enumerate(optimizar_barras(piezas),1):
-                        st.write(f"Tira {i}: {[r(x) for x in b]} | sobra {r(600 - sum(b))}")
+                    for i, b in enumerate(optimizar_barras(piezas),1):
+                        st.write(f"Tira {i}: {[r(x) for x in b]} | sobra {r(600-sum(b))}")
+
+        st.download_button("PDF Ventanas", generar_pdf(st.session_state.pedido), "ventanas.pdf")
+        st.download_button("PDF Optimización", generar_pdf_optimizacion(todos), "optimizacion.pdf")
 
 # ================= COTIZACIÓN m² =================
 elif modo == "Cotización m²":
 
-    st.header("📐 Cotización por Metro Cuadrado")
+    st.header("Cotización m²")
 
-    precio_m2 = st.number_input("Precio por m²", 100.0, 1000.0, 300.0)
+    precio = st.number_input("Precio por m²", 100.0, 1000.0, 300.0)
 
-    c1, c2 = st.columns(2)
-    ancho = c1.number_input("Ancho (cm)", 0.0)
-    alto = c2.number_input("Alto (cm)", 0.0)
+    c1,c2 = st.columns(2)
+    anc = c1.number_input("Ancho",0.0)
+    alt = c2.number_input("Alto",0.0)
 
     if st.button("Agregar"):
-        if ancho > 0 and alto > 0:
-            area = (ancho * alto) / 10000
-            total = area * precio_m2
+        if anc>0 and alt>0:
+            area = (anc*alt)/10000
+            total = area*precio
+            st.session_state.cot_m2.append((anc,alt,total))
 
-            st.session_state.cot_m2.append({
-                "ancho": ancho,
-                "alto": alto,
-                "area": area,
-                "precio": precio_m2,
-                "total": total
-            })
+    total_general = 0
 
-    if st.session_state.cot_m2:
-        total_general = 0
+    for i,(a,h,t) in enumerate(st.session_state.cot_m2):
+        st.write(f"{r(a)} x {r(h)} = {r(t)} Bs")
+        total_general += t
 
-        for i, c in enumerate(st.session_state.cot_m2):
-            st.write(f"{r(c['ancho'])} x {r(c['alto'])} → {r(c['total'])} Bs")
-            total_general += c["total"]
-
+    if total_general>0:
         st.success(f"TOTAL: {r(total_general)} Bs")
