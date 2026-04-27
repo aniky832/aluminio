@@ -1,26 +1,7 @@
-def calcular_materiales(todos):
-    import math
-    resumen = {}
-
-    # perfiles (barras)
-    for p, piezas in todos.items():
-        if piezas:
-            barras = optimizar_barras(piezas)
-            resumen[p] = len(barras)
-
-    # vidrio
-    total_area = 0
-    for v in st.session_state.pedido:
-        vid = v["vidrio"]
-        total_area += vid["ancho"] * vid["alto"] * vid["cant"]
-
-    area_plancha = 330 * 214
-    resumen["VIDRIO"] = math.ceil(total_area / area_plancha)
-
-    return resumen
 import streamlit as st
 import json
 from fpdf import FPDF
+import math
 
 # ---------------- UTIL ----------------
 def r(x): return round(x,1)
@@ -38,6 +19,25 @@ def optimizar_barras(piezas, largo=600):
         if not colocado:
             barras.append([p])
     return barras
+
+# ---------------- MATERIAL ----------------
+def calcular_materiales(todos, pedido):
+    resumen = {}
+
+    for p, piezas in todos.items():
+        if piezas:
+            barras = optimizar_barras(piezas)
+            resumen[p] = len(barras)
+
+    total_area = 0
+    for v in pedido:
+        vid = v["vidrio"]
+        total_area += vid["ancho"] * vid["alto"] * vid["cant"]
+
+    area_plancha = 330 * 214
+    resumen["VIDRIO"] = math.ceil(total_area / area_plancha)
+
+    return resumen
 
 # ---------------- PDF ----------------
 def pdf_descuentos(pedido):
@@ -213,16 +213,6 @@ if st.session_state.pedido:
 
     # ---------------- OPTIMIZAR ----------------
     if st.button("🪚 Optimizar"):
-        st.divider()
-st.subheader("📦 Material a Comprar")
-
-resumen = calcular_materiales(todos)
-
-for k, v in resumen.items():
-    if k == "VIDRIO":
-        st.write(f"{k}: {v} planchas (330x214)")
-    else:
-        st.write(f"{k}: {v} barras")
         st.subheader("Resultado de Optimización")
 
         for p, piezas in todos.items():
@@ -232,6 +222,18 @@ for k, v in resumen.items():
 
                 for i, b in enumerate(barras, 1):
                     st.write(f"Tira {i}: {[r(x) for x in b]} → Sobra {r(600 - sum(b))} cm")
+
+    # ---------------- MATERIAL ----------------
+    st.divider()
+    st.subheader("📦 Material a Comprar")
+
+    resumen = calcular_materiales(todos, st.session_state.pedido)
+
+    for k, v in resumen.items():
+        if k == "VIDRIO":
+            st.write(f"{k}: {v} planchas (330x214)")
+        else:
+            st.write(f"{k}: {v} barras")
 
     # ---------------- PDF ----------------
     st.divider()
