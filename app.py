@@ -89,14 +89,10 @@ def pdf_optimizacion(todos):
 # ---------------- PDF COTIZACION ----------------
 def pdf_cotizacion_m2(pedido, cliente, precio_m2):
     from datetime import datetime
-    from fpdf import FPDF
 
     pdf = FPDF()
     pdf.add_page()
 
-    def r(x): return round(x,1)
-
-    # ---- ENCABEZADO ----
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(190, 10, "COTIZACION", ln=True, align="C")
 
@@ -106,13 +102,56 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
 
     pdf.ln(5)
 
-    def pdf_ventanas_con_cortes(pedido):
-    from fpdf import FPDF
+    y_base = pdf.get_y()
+    col = 0
+    total_general = 0
 
+    for i, v in enumerate(pedido):
+        anc = float(v["medida"].split("x")[0])
+        alt = float(v["medida"].split("x")[1])
+        hojas = v["div"]
+
+        area = (anc * alt) / 10000
+        total = area * precio_m2
+        total_general += total
+
+        x = 15 + (col * 95)
+        y = y_base
+
+        pdf.set_xy(x, y)
+        pdf.cell(80, 5, f"V{i+1}", ln=False)
+
+        y += 6
+        w, h = 60, 35
+
+        pdf.rect(x, y, w, h)
+
+        for j in range(1, hojas):
+            pdf.line(x + (w/hojas)*j, y, x + (w/hojas)*j, y + h)
+
+        pdf.line(x, y+h+2, x+w, y+h+2)
+        pdf.text(x + w/2 - 10, y+h+6, f"{r(anc)}")
+
+        pdf.line(x-3, y, x-3, y+h)
+        pdf.text(x-15, y + h/2, f"{r(alt)}")
+
+        pdf.text(x, y+h+12, f"{r(total)} Bs")
+
+        col += 1
+        if col == 2:
+            col = 0
+            y_base += 55
+
+    pdf.set_y(y_base + 5)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(190, 10, f"TOTAL: {r(total_general)} Bs", ln=True)
+
+    return pdf.output(dest='S').encode('latin1')
+
+# ---------------- PDF PRODUCCION VISUAL ----------------
+def pdf_ventanas_con_cortes(pedido):
     pdf = FPDF()
     pdf.add_page()
-
-    def r(x): return round(x,1)
 
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(190, 10, "PRODUCCION - VENTANAS", ln=True, align="C")
@@ -122,7 +161,6 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
     col = 0
 
     for i, v in enumerate(pedido):
-
         anc = float(v["medida"].split("x")[0])
         alt = float(v["medida"].split("x")[1])
         hojas = v["div"]
@@ -130,23 +168,16 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
         x = 15 + (col * 95)
         y = y_base
 
-        # número ventana
         pdf.set_xy(x, y)
-        pdf.set_font("Helvetica", "B", 10)
         pdf.cell(80, 5, f"V{i+1}", ln=False)
 
         y += 6
         w, h = 60, 30
 
-        # marco
         pdf.rect(x, y, w, h)
 
-        # divisiones
         for j in range(1, hojas):
             pdf.line(x + (w/hojas)*j, y, x + (w/hojas)*j, y + h)
-
-        # medidas
-        pdf.set_font("Helvetica", "", 8)
 
         pdf.line(x, y+h+2, x+w, y+h+2)
         pdf.text(x + w/2 - 10, y+h+6, f"{r(anc)}")
@@ -154,7 +185,6 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
         pdf.line(x-3, y, x-3, y+h)
         pdf.text(x-15, y + h/2, f"{r(alt)}")
 
-        # ---- DESCUENTOS ----
         y_texto = y + h + 10
 
         pdf.set_xy(x, y_texto)
@@ -168,93 +198,9 @@ def pdf_cotizacion_m2(pedido, cliente, precio_m2):
             pdf.cell(80, 4, f"{info['cant']} {n}: {r(info['medida'])}", ln=True)
 
         col += 1
-
         if col == 2:
             col = 0
             y_base = y_texto + 30
-
-    return pdf.output(dest='S').encode('latin1')
-    # ---- DIBUJOS ----
-    y_base = pdf.get_y()
-    col = 0
-    total_general = 0
-
-    for i, v in enumerate(pedido):
-
-        anc = float(v["medida"].split("x")[0])
-        alt = float(v["medida"].split("x")[1])
-        hojas = v["div"]
-
-        area = (anc * alt) / 10000
-        total = area * precio_m2
-        total_general += total
-
-        # posición
-        x = 15 + (col * 95)
-        y = y_base
-
-        # título ventana
-        pdf.set_xy(x, y)
-        pdf.cell(80, 5, f"V{i+1}", ln=False)
-
-        y += 6
-        w, h = 60, 35
-
-        # marco
-        pdf.rect(x, y, w, h)
-
-        # divisiones
-        for j in range(1, hojas):
-            pdf.line(x + (w/hojas)*j, y, x + (w/hojas)*j, y + h)
-
-        # ancho (abajo)
-        pdf.line(x, y+h+2, x+w, y+h+2)
-        pdf.text(x + w/2 - 10, y+h+6, f"{r(anc)}")
-
-        # alto (lado)
-        pdf.line(x-3, y, x-3, y+h)
-        pdf.text(x-15, y + h/2, f"{r(alt)}")
-
-        col += 1
-        if col == 2:
-            col = 0
-            y_base += 55
-
-    # ---- TOTAL ----
-    pdf.set_y(y_base + 5)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(190, 10, f"TOTAL: {r(total_general)} Bs", ln=True)
-
-    return pdf.output(dest='S').encode('latin1')
-    from datetime import datetime
-
-    pdf = FPDF()
-    pdf.add_page()
-
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, "COTIZACION", ln=True, align="C")
-
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(190, 6, f"Cliente: {cliente}", ln=True)
-    pdf.cell(190, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-
-    pdf.ln(5)
-
-    total_general = 0
-
-    for i, v in enumerate(pedido):
-        anc = float(v["medida"].split("x")[0])
-        alt = float(v["medida"].split("x")[1])
-
-        area = (anc * alt) / 10000
-        total = area * precio_m2
-        total_general += total
-
-        pdf.cell(190, 6, f"Ventana {i+1}: {r(anc)} x {r(alt)} → {r(total)} Bs", ln=True)
-
-    pdf.ln(5)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(190, 10, f"TOTAL: {r(total_general)} Bs", ln=True)
 
     return pdf.output(dest='S').encode('latin1')
 
@@ -340,9 +286,6 @@ if st.session_state.pedido:
 
             col1, col2 = st.columns(2)
 
-            if col1.button("✏️ Editar", key=f"edit{i}"):
-                st.session_state[f"edit_{i}"] = True
-
             if col2.button("❌ Eliminar", key=f"del{i}"):
                 st.session_state.pedido.pop(i)
                 st.rerun()
@@ -380,6 +323,9 @@ if st.session_state.pedido:
     pdf2 = pdf_optimizacion(todos)
     st.download_button("📄 PDF Optimización", pdf2, "optimizacion.pdf")
 
+    pdf3 = pdf_ventanas_con_cortes(st.session_state.pedido)
+    st.download_button("📄 PDF Producción (Ventanas + Cortes)", pdf3, "produccion_visual.pdf")
+
     # ---------------- COTIZAR ----------------
     st.divider()
     st.subheader("💰 Cotizar (m²)")
@@ -392,27 +338,12 @@ if st.session_state.pedido:
     for v in st.session_state.pedido:
         anc = float(v["medida"].split("x")[0])
         alt = float(v["medida"].split("x")[1])
-
         area = (anc * alt) / 10000
-        total = area * precio_m2
-        total_general += total
+        total_general += area * precio_m2
 
     st.success(f"TOTAL: {r(total_general)} Bs")
 
     if st.button("📄 Generar PDF Cotización m²"):
         pdf = pdf_cotizacion_m2(st.session_state.pedido, cliente, precio_m2)
 
-        st.download_button(
-            "⬇ Descargar PDF",
-            pdf,
-            "cotizacion_m2.pdf",
-            "application/pdf"
-        )
-pdf_detalle = pdf_ventanas_con_cortes(st.session_state.pedido)
-
-st.download_button(
-    "📄 PDF Producción (Ventanas + Cortes)",
-    pdf_detalle,
-    "produccion_visual.pdf",
-    "application/pdf"
-)
+        st.download_button("⬇ Descargar PDF", pdf, "cotizacion_m2.pdf")
